@@ -14,11 +14,12 @@ type EntrypointCb func(ctx utils.Context) error
 type Entrypoint struct {
 	Context       context.Context
 	Directories   []string
+	EnvRunAsGid   string
+	EnvRunAsUid   string
 	HealthCb      EntrypointCb
 	LocalUsername string
 	Logger        *slog.Logger
 	MainCb        EntrypointCb
-	RunAsUser     utils.User
 	Version       string
 }
 
@@ -41,7 +42,10 @@ func (e Entrypoint) Bootstrap() error {
 		}
 
 		if runAsUser.Uid == 0 {
-			runAsUser = e.RunAsUser
+			runAsUser, err := utils.UserFromEnv(ctx, e.EnvRunAsUid, e.EnvRunAsGid)
+			if err != nil {
+				return err
+			}
 
 			localUser, err := utils.UserFromUsername(ctx, e.LocalUsername)
 			if err != nil {
@@ -115,11 +119,12 @@ func (e Entrypoint) Run() {
 type Opts struct {
 	Context       context.Context
 	Directories   []string
+	EnvRunAsGid   string
+	EnvRunAsUid   string
 	Health        EntrypointCb
 	LocalUsername string
 	Logger        *slog.Logger
 	Main          EntrypointCb
-	RunAsUser     utils.User
 	Version       string
 }
 
@@ -136,10 +141,18 @@ func New(opts Opts) (Entrypoint, error) {
 	if directories == nil {
 		directories = []string{}
 	}
+	envRunAsGid := opts.EnvRunAsGid
+	if envRunAsGid == "" {
+		envRunAsGid = "GID"
+	}
+	envRunAsUid := opts.EnvRunAsUid
+	if envRunAsUid == "" {
+		envRunAsUid = "UID"
+	}
 	healthCb := opts.Health
 	localUsername := opts.LocalUsername
 	if localUsername == "" {
-		return fail(fmt.Errorf("field LocalUsername is required"))
+		localUsername = "server"
 	}
 	logger := opts.Logger
 	if logger == nil {
@@ -149,10 +162,6 @@ func New(opts Opts) (Entrypoint, error) {
 	if mainCb == nil {
 		return fail(fmt.Errorf("field Main is required"))
 	}
-	runAsUser := opts.RunAsUser
-	if runAsUser == (utils.User{}) {
-		return fail(fmt.Errorf("field RunAsUser is required"))
-	}
 	version := opts.Version
 	if version == "" {
 		return fail(fmt.Errorf("field Version is required"))
@@ -161,11 +170,12 @@ func New(opts Opts) (Entrypoint, error) {
 	return Entrypoint{
 		Context:       ctx,
 		Directories:   directories,
+		EnvRunAsGid:   envRunAsGid,
+		EnvRunAsUid:   envRunAsUid,
 		HealthCb:      healthCb,
 		LocalUsername: localUsername,
 		Logger:        logger,
 		MainCb:        mainCb,
-		RunAsUser:     runAsUser,
 		Version:       version,
 	}, nil
 }

@@ -1,0 +1,43 @@
+{
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "golang.go",
+        "rohit-gohri.format-code-action"
+      ],
+      "settings": {
+        "editor.codeActionsOnSave": [
+          "source.organizeImports",
+          "source.formatDocument"
+        ],
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[dockerfile]": {
+          "editor.defaultFormatter": null
+        },
+        "[go]": {
+          "editor.defaultFormatter": "golang.go"
+        }
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.23.4"
+    },
+    "ghcr.io/rocker-org/devcontainer-features/apt-packages:1": {
+      "packages": [
+        "curl",
+        "git",
+        "gosu",
+        "p7zip-full",
+        "tar",
+        "unzip",
+        "vim"
+      ]
+    }
+  },
+  "image": "ubuntu:noble",
+  "postCreateCommand": ".devcontainer/post-create.sh"
+}

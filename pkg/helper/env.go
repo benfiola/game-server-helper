@@ -1,4 +1,4 @@
-package common
+package helper
 
 import (
 	"github.com/caarlos0/env/v11"

@@ -1,10 +1,22 @@
-package common
+package helper
 
 import (
 	"errors"
 	"fmt"
 	"os"
 )
+
+// DirectoryMap stores a label to path mapping
+type DirectoryMap map[string]string
+
+// Returns a list of paths stored in the directory map
+func (dm *DirectoryMap) List() []string {
+	list := []string{}
+	for _, directory := range *dm {
+		list = append(list, directory)
+	}
+	return list
+}
 
 // Creates the provided directories
 // Returns an error if any directories fail to create

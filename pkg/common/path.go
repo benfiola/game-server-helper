@@ -31,7 +31,7 @@ func (api *Api) SetOwnerForPaths(owner User, paths ...string) error {
 	}
 
 	for _, path := range paths {
-		api.Logger.Info("ensure directory ownership", "owner", owner)
+		api.Logger.Info("ensure directory ownership", "owner", owner, "path", path)
 		_, err = api.RunCommand([]string{"chown", "-R", fmt.Sprintf("%d:%d", owner.Uid, owner.Gid), path}, CmdOpts{})
 		if err != nil {
 			return err

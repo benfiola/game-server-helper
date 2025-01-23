@@ -116,9 +116,11 @@ func (api *Api) RunCommandUntil(cmdSlice []string, opts CmdUntilOpts) error {
 			IgnoreSignals: opts.IgnoreSignals,
 			User:          opts.User,
 		})
+		api.Logger.Info("command finished")
 		cmdFinished <- true
 	}()
 
+	cbFinished := make(chan bool, 1)
 	var cbErr error
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -141,9 +143,12 @@ func (api *Api) RunCommandUntil(cmdSlice []string, opts CmdUntilOpts) error {
 				break
 			}
 		}
+		api.Logger.Info("callback finished")
+		cbFinished <- true
 	}()
 
 	<-cmdFinished
+	<-cbFinished
 
 	select {
 	case <-sctx.Done():

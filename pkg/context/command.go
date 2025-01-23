@@ -1,4 +1,4 @@
-package utils
+package context
 
 import (
 	"fmt"
@@ -7,25 +7,27 @@ import (
 	"strings"
 )
 
+// CmdOpts defines the options used in conjunction with the [RunCommand] function
 type CmdOpts struct {
-	Attach bool
-	Cwd    string
-	Debug  bool
-	Env    []string
-	User   *User
+	Attach        bool
+	Cwd           string
+	Env           []string
+	IgnoreSignals bool
+	User          User
 }
 
-func RunCommand(ctx Context, cmdSlice []string, opts CmdOpts) (string, error) {
+// Runs a command (defined as a string slice) and returns the stdout.
+// Raises an error if the command fails.
+func (ctx *Context) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) {
 	fail := func(err error) (string, error) {
 		return "", err
 	}
 
-	currentUser, err := UserFromCurrent(ctx)
+	currentUser, err := ctx.GetCurrentUser()
 	if err != nil {
 		return fail(err)
 	}
-
-	if opts.User != nil && *opts.User != currentUser {
+	if opts.User != (User{}) && opts.User != currentUser {
 		cmdSlice = append([]string{"gosu", fmt.Sprintf("%d:%d", opts.User.Uid, opts.User.Gid)}, cmdSlice...)
 	}
 
@@ -47,10 +49,15 @@ func RunCommand(ctx Context, cmdSlice []string, opts CmdOpts) (string, error) {
 	if opts.Env != nil {
 		command.Env = opts.Env
 	}
+	if !opts.IgnoreSignals {
+		ctx.HandleSignals(func(sig os.Signal) {
+			command.Process.Signal(sig)
+		})
+	}
 
 	err = command.Run()
-	if err != nil && opts.Debug {
-		ctx.Logger().Error("run cmd failed", "command", cmdSlice, "stdout", stdoutBuffer.String(), "stderr", stderrBuffer.String())
+	if err != nil && !opts.Attach {
+		ctx.Logger().Error("run cmd failed", "command", cmdSlice, "stderr", stderrBuffer.String())
 	}
 
 	return stdoutBuffer.String(), err

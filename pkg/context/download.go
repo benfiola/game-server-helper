@@ -1,4 +1,4 @@
-package utils
+package context
 
 import (
 	"fmt"
@@ -8,9 +8,13 @@ import (
 	"path/filepath"
 )
 
-type DownloadCb func(path string) error
+// downloadCb is a callback invoked with a temporary path pointing to a downloaded file
+type downloadCb func(path string) error
 
-func Download(ctx Context, url string, downloadCb DownloadCb) error {
+// Downloads a url to a temporary file and invokes a callback with the path to the temporary file.
+// Returns an error if the download fails.
+// Returns an error if the callback returns an error.
+func (ctx *Context) Download(url string, cb downloadCb) error {
 	tempDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return err
@@ -41,5 +45,5 @@ func Download(ctx Context, url string, downloadCb DownloadCb) error {
 		return err
 	}
 
-	return downloadCb(tempFile)
+	return cb(tempFile)
 }

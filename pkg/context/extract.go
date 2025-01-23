@@ -1,11 +1,21 @@
-package utils
+package context
 
 import (
 	"fmt"
 	"strings"
 )
 
-func Extract(ctx Context, src string, dest string) error {
+// Extracts a src archive to a dest folder.
+// Returns a failure if the archive type is unrecongized.
+// Returns a failure if the extract operation fails.
+func (ctx *Context) Extract(src string, dest string) error {
+	ctx.Logger().Info("extract", "src", src, "dest", dest)
+
+	err := ctx.CreateDirs(dest)
+	if err != nil {
+		return err
+	}
+
 	var cmd []string
 	if strings.HasSuffix(src, ".rar") {
 		cmd = []string{"unrar", "-f", "-x", src, dest}
@@ -16,9 +26,9 @@ func Extract(ctx Context, src string, dest string) error {
 	} else if strings.HasSuffix(src, ".7z") {
 		cmd = []string{"7z", "x", src, fmt.Sprintf("-o%s", dest)}
 	} else {
-		return fmt.Errorf("unimplemented extension %s", src)
+		return fmt.Errorf("unrecongized file type %s", src)
 	}
 
-	_, err := RunCommand(ctx, cmd, CmdOpts{})
+	_, err = ctx.RunCommand(cmd, CmdOpts{})
 	return err
 }

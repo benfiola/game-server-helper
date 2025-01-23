@@ -1,181 +1,155 @@
 package entrypoint
 
 import (
-	"context"
+	basecontext "context"
 	"fmt"
 	"log/slog"
 	"os"
 
-	"github.com/benfiola/game-server-helper/pkg/utils"
+	"github.com/benfiola/game-server-helper/pkg/context"
 )
 
-type EntrypointCb func(ctx utils.Context) error
+// A callback is an entrypoint task ultimately invoked through [Entrypoint.RunCallback]
+type callback func(ctx context.Context) error
 
+// An Entrypoint wraps common tasks that need to be performed by many game server docker images.
 type Entrypoint struct {
-	Context       context.Context
-	Directories   []string
-	EnvRunAsGid   string
-	EnvRunAsUid   string
-	HealthCb      EntrypointCb
-	LocalUsername string
-	Logger        *slog.Logger
-	MainCb        EntrypointCb
-	Version       string
+	Action      callback
+	Context     basecontext.Context
+	Directories []string
+	HealthCheck callback
+	Logger      *slog.Logger
+	Version     string
 }
 
-func (e Entrypoint) RunWithContext(cb EntrypointCb) error {
-	parent := e.Context
-	if parent == nil {
-		parent = context.Background()
+// Initialies the entrypoint - setting struct member defaults and validating others.
+// This is called automatically if [Entrypoint.Main] is called.  Otherwise, it is expected that this function is called prior to calling any [Entrypoint] methods.
+// Returns an error if invalid arguments are provided to the [Entrypoint].
+func (e *Entrypoint) initialize() error {
+	if e.Action == nil {
+		return fmt.Errorf("entrypoint action must be defined")
 	}
-	ctx := utils.Context{Context: parent}
-	return cb(ctx)
+	if e.Context == nil {
+		e.Context = basecontext.Background()
+	}
+	if e.Directories == nil {
+		e.Directories = []string{}
+	}
+	if e.Logger == nil {
+		e.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
+	}
+	if e.Version == "" {
+		return fmt.Errorf("entrypoint version must be defined")
+	}
+	return nil
 }
 
-func (e Entrypoint) Bootstrap() error {
-	return e.RunWithContext(func(ctx utils.Context) error {
-		ctx.Logger().Info("bootstrap")
+// Creates a [context.Context] and runs the given [callback] with it.
+func (e *Entrypoint) runCallback(cb callback) error {
+	sctx := context.Context{Context: e.Context}
+	return cb(sctx)
+}
 
-		runAsUser, err := utils.UserFromCurrent(ctx)
-		if err != nil {
-			return err
-		}
+// Runs the entrypoint action.
+// Returns an error if the entrypoint action fails.
+func (e *Entrypoint) action(ctx context.Context) error {
+	return e.runCallback(e.Action)
+}
 
-		if runAsUser.Uid == 0 {
-			runAsUser, err := utils.UserFromEnv(ctx, e.EnvRunAsUid, e.EnvRunAsGid)
-			if err != nil {
-				return err
-			}
+// 'Bootstraps' the entrypoint.
+// When run as root, the entrypoint will determine a non-root user, take ownership of necessary directories with this non-root user, and then relaunch the entrypoint as this non-root user.
+// When run as non-root, the entrypoint will relaunch itself.
+func (e *Entrypoint) bootstrap(ctx context.Context) error {
+	ctx.Logger().Info("bootstrap")
 
-			localUser, err := utils.UserFromUsername(ctx, e.LocalUsername)
-			if err != nil {
-				return err
-			}
-
-			err = localUser.UpdateGidUid(ctx, runAsUser)
-			if err != nil {
-				return err
-			}
-
-			err = utils.SetDirectoryOwner(ctx, runAsUser, e.Directories...)
-			if err != nil {
-				return err
-			}
-		}
-
-		executable, err := os.Executable()
-		if err != nil {
-			return err
-		}
-
-		_, err = utils.RunCommand(ctx, []string{executable, "entrypoint"}, utils.CmdOpts{Attach: true, Env: os.Environ(), User: &runAsUser})
+	runAsUser, err := ctx.GetCurrentUser()
+	if err != nil {
 		return err
-	})
-}
+	}
+	currentUser := runAsUser
 
-func (e Entrypoint) Health() error {
-	return e.RunWithContext(e.HealthCb)
-}
+	if currentUser.Uid == 0 {
+		runAsUser, err = ctx.GetEnvUser()
+		if err != nil {
+			return err
+		}
 
-func (e Entrypoint) Main() error {
-	return e.RunWithContext(e.MainCb)
-}
+		err = ctx.UpdateUser("server", runAsUser)
+		if err != nil {
+			return err
+		}
 
-func (e Entrypoint) PrintVersion() error {
-	return e.RunWithContext(func(ctx utils.Context) error {
-		fmt.Print(e.Version)
-		return nil
-	})
-}
-
-func (e Entrypoint) Run() {
-	cmd := "bootstrap"
-	if len(os.Args) > 0 {
-		cmd = os.Args[0]
+		err = ctx.SetOwnerForPaths(runAsUser, e.Directories...)
+		if err != nil {
+			return err
+		}
 	}
 
-	var err error
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	_, err = ctx.RunCommand([]string{executable, "action"}, context.CmdOpts{Attach: true, Env: os.Environ(), User: runAsUser})
+	return err
+}
+
+// Runs the entrypoint health check.
+// Returns an error if the entrypoint health check fails.
+func (e *Entrypoint) healthCheck(ctx context.Context) error {
+	if e.HealthCheck == nil {
+		return fmt.Errorf("entrypoint health check not defined")
+	}
+
+	return e.runCallback(e.HealthCheck)
+}
+
+// Prints the version
+func (e *Entrypoint) printVersion(ctx context.Context) error {
+	fmt.Print(e.Version)
+	return nil
+}
+
+// Runs the entrypoint with the provided arguments.
+// Returns an error on failure.
+func (e *Entrypoint) main(args ...string) error {
+	err := e.initialize()
+	if err != nil {
+		return err
+	}
+
+	cmd := "bootstrap"
+	if len(args) > 0 {
+		cmd = args[0]
+	}
+
 	switch cmd {
+	case "action":
+		err = e.runCallback(e.action)
 	case "bootstrap":
-		err = e.Bootstrap()
+		err = e.runCallback(e.bootstrap)
 	case "health":
-		err = e.Health()
-	case "main":
-		err = e.Main()
+		err = e.runCallback(e.healthCheck)
 	case "version":
-		err = e.PrintVersion()
+		err = e.runCallback(e.printVersion)
 	default:
 		err = fmt.Errorf("unknown command %s", cmd)
 	}
+
+	return err
+}
+
+// Runs the entrypoint with the process arguments, and exits on completion.
+// Exits with status code 0 on success.
+// Exits with status code 1 on failure.
+func (e *Entrypoint) Run() {
+	err := e.main(os.Args...)
 
 	code := 0
 	if err != nil {
 		code = 1
 		e.Logger.Error("entrypoint failed", "error", err.Error())
 	}
+
 	os.Exit(code)
-}
-
-type Opts struct {
-	Context       context.Context
-	Directories   []string
-	EnvRunAsGid   string
-	EnvRunAsUid   string
-	Health        EntrypointCb
-	LocalUsername string
-	Logger        *slog.Logger
-	Main          EntrypointCb
-	Version       string
-}
-
-func New(opts Opts) (Entrypoint, error) {
-	fail := func(err error) (Entrypoint, error) {
-		return Entrypoint{}, err
-	}
-
-	ctx := opts.Context
-	if ctx != nil {
-		ctx = context.Background()
-	}
-	directories := opts.Directories
-	if directories == nil {
-		directories = []string{}
-	}
-	envRunAsGid := opts.EnvRunAsGid
-	if envRunAsGid == "" {
-		envRunAsGid = "GID"
-	}
-	envRunAsUid := opts.EnvRunAsUid
-	if envRunAsUid == "" {
-		envRunAsUid = "UID"
-	}
-	healthCb := opts.Health
-	localUsername := opts.LocalUsername
-	if localUsername == "" {
-		localUsername = "server"
-	}
-	logger := opts.Logger
-	if logger == nil {
-		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
-	}
-	mainCb := opts.Main
-	if mainCb == nil {
-		return fail(fmt.Errorf("field Main is required"))
-	}
-	version := opts.Version
-	if version == "" {
-		return fail(fmt.Errorf("field Version is required"))
-	}
-
-	return Entrypoint{
-		Context:       ctx,
-		Directories:   directories,
-		EnvRunAsGid:   envRunAsGid,
-		EnvRunAsUid:   envRunAsUid,
-		HealthCb:      healthCb,
-		LocalUsername: localUsername,
-		Logger:        logger,
-		MainCb:        mainCb,
-		Version:       version,
-	}, nil
 }

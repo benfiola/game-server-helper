@@ -9,14 +9,32 @@ import (
 	"github.com/benfiola/game-server-helper/pkg/common"
 )
 
+// DirectoryMap stores a label to path mapping
+type DirectoryMap map[string]string
+
+// Returns a list of paths stored in the directory map
+func (dm *DirectoryMap) List() []string {
+	list := []string{}
+	for _, directory := range *dm {
+		list = append(list, directory)
+	}
+	return list
+}
+
+// Composes a [common.Api] and adds entrypoint specific information
+type Api struct {
+	common.Api
+	Directories DirectoryMap
+}
+
 // A callback is an entrypoint task ultimately invoked through [Entrypoint.RunCallback]
-type callback func(ctx context.Context, api common.Api) error
+type callback func(ctx context.Context, api Api) error
 
 // An Entrypoint wraps common tasks that need to be performed by many game server docker images.
 type Entrypoint struct {
 	Action      callback
 	Context     context.Context
-	Directories []string
+	Directories map[string]string
 	HealthCheck callback
 	Logger      *slog.Logger
 	Version     string
@@ -33,7 +51,7 @@ func (e *Entrypoint) initialize() error {
 		e.Context = context.Background()
 	}
 	if e.Directories == nil {
-		e.Directories = []string{}
+		e.Directories = map[string]string{}
 	}
 	if e.Logger == nil {
 		e.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
@@ -46,20 +64,21 @@ func (e *Entrypoint) initialize() error {
 
 // Creates a [context.Context] and runs the given [callback] with it.
 func (e *Entrypoint) runCallback(cb callback) error {
-	api := common.Api{Logger: e.Logger}
+	commonApi := common.Api{Logger: e.Logger}
+	api := Api{Api: commonApi, Directories: DirectoryMap(e.Directories)}
 	return cb(e.Context, api)
 }
 
 // Runs the entrypoint action.
 // Returns an error if the entrypoint action fails.
-func (e *Entrypoint) action(ctx context.Context, api common.Api) error {
+func (e *Entrypoint) action(ctx context.Context, api Api) error {
 	return e.Action(ctx, api)
 }
 
 // 'Bootstraps' the entrypoint.
 // When run as root, the entrypoint will determine a non-root user, take ownership of necessary directories with this non-root user, and then relaunch the entrypoint as this non-root user.
 // When run as non-root, the entrypoint will relaunch itself.
-func (e *Entrypoint) bootstrap(ctx context.Context, api common.Api) error {
+func (e *Entrypoint) bootstrap(ctx context.Context, api Api) error {
 	api.Logger.Info("bootstrap")
 
 	runAsUser, err := api.GetCurrentUser()
@@ -79,7 +98,7 @@ func (e *Entrypoint) bootstrap(ctx context.Context, api common.Api) error {
 			return err
 		}
 
-		err = api.SetOwnerForPaths(runAsUser, e.Directories...)
+		err = api.SetOwnerForPaths(runAsUser, api.Directories.List()...)
 		if err != nil {
 			return err
 		}
@@ -96,7 +115,7 @@ func (e *Entrypoint) bootstrap(ctx context.Context, api common.Api) error {
 
 // Runs the entrypoint health check.
 // Returns an error if the entrypoint health check fails.
-func (e *Entrypoint) healthCheck(ctx context.Context, api common.Api) error {
+func (e *Entrypoint) healthCheck(ctx context.Context, api Api) error {
 	if e.HealthCheck == nil {
 		return fmt.Errorf("entrypoint health check not defined")
 	}
@@ -105,7 +124,7 @@ func (e *Entrypoint) healthCheck(ctx context.Context, api common.Api) error {
 }
 
 // Prints the version
-func (e *Entrypoint) printVersion(ctx context.Context, api common.Api) error {
+func (e *Entrypoint) printVersion(ctx context.Context, api Api) error {
 	fmt.Print(e.Version)
 	return nil
 }

@@ -1,4 +1,4 @@
-package context
+package common
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 
 // SignalHandler holds data required for a signal handler
 type SignalHandler struct {
-	Ctx             Context
+	Api             Api
 	HandlerFinished chan bool
 	Signal          syscall.Signal
 	SignalChannel   chan os.Signal
@@ -26,7 +26,7 @@ func (sh *SignalHandler) Wait() {
 		return
 	}
 
-	sh.Ctx.Logger().Info("wait for signal handler")
+	sh.Api.Logger.Info("wait for signal handler")
 	<-sh.HandlerFinished
 }
 
@@ -34,9 +34,9 @@ func (sh *SignalHandler) Wait() {
 type signalHandlerCb func(sig os.Signal)
 
 // Creates a signal handler and registers it.  When a signal is raised, the provided callback is invoked.
-func (ctx *Context) HandleSignals(cb signalHandlerCb) SignalHandler {
+func (api *Api) HandleSignals(cb signalHandlerCb) SignalHandler {
 	sh := SignalHandler{
-		Ctx:             *ctx,
+		Api:             *api,
 		HandlerFinished: make(chan bool, 1),
 		SignalChannel:   make(chan os.Signal, 1),
 	}
@@ -49,7 +49,7 @@ func (ctx *Context) HandleSignals(cb signalHandlerCb) SignalHandler {
 		}
 
 		signal := <-sh.SignalChannel
-		ctx.Logger().Info("signal caught", "signal", signal)
+		api.Logger.Info("signal caught", "signal", signal)
 		cb(signal)
 		sh.HandlerFinished <- true
 	}()

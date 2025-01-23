@@ -1,4 +1,4 @@
-package context
+package common
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ type User struct {
 // Returns a [User] representing the current process' user
 // Returns an error if fetching the current user fails.
 // Returns an error if the resulting user has a non-numeric gid/uid.
-func (ctx *Context) GetCurrentUser() (User, error) {
+func (api *Api) GetCurrentUser() (User, error) {
 	fail := func(err error) (User, error) {
 		return User{}, err
 	}
@@ -43,7 +43,7 @@ func (ctx *Context) GetCurrentUser() (User, error) {
 // Looks up a user by username and returns a [User].
 // Returns an error if the lookup fails.
 // Returns an error if the resulting user has a non-numeric gid/uid.
-func (ctx *Context) LookupUser(username string) (User, error) {
+func (api *Api) LookupUser(username string) (User, error) {
 	fail := func(err error) (User, error) {
 		return User{}, err
 	}
@@ -68,34 +68,34 @@ func (ctx *Context) LookupUser(username string) (User, error) {
 
 // Returns a [User] representing a gid/uid as set in the environment
 // Returns an error if the resulting user has a non-numeric gid/uid.
-func (ctx *Context) GetEnvUser() (User, error) {
+func (api *Api) GetEnvUser() (User, error) {
 	user := User{}
 	err := env.Parse(&user)
 	return user, err
 }
 
 // Updates the gid/uid of the given username
-func (ctx *Context) UpdateUser(username string, to User) error {
+func (api *Api) UpdateUser(username string, to User) error {
 	if to.Uid == 0 {
 		return fmt.Errorf("refusing to update username %s to uid 0", username)
 	}
 
-	from, err := ctx.LookupUser(username)
+	from, err := api.LookupUser(username)
 	if err != nil {
 		return err
 	}
 
 	if from.Uid != to.Uid {
-		ctx.Logger().Info("change uid", "user", username, "from", from.Uid, "to", to.Uid)
-		_, err := ctx.RunCommand([]string{"usermod", "-u", strconv.Itoa(to.Uid), username}, CmdOpts{})
+		api.Logger.Info("change uid", "user", username, "from", from.Uid, "to", to.Uid)
+		_, err := api.RunCommand([]string{"usermod", "-u", strconv.Itoa(to.Uid), username}, CmdOpts{})
 		if err != nil {
 			return err
 		}
 	}
 
 	if from.Gid != to.Gid {
-		ctx.Logger().Info("change gid", "user", username, "from", from.Gid, "to", to.Gid)
-		_, err := ctx.RunCommand([]string{"groupmod", "-g", strconv.Itoa(to.Gid), username}, CmdOpts{})
+		api.Logger.Info("change gid", "user", username, "from", from.Gid, "to", to.Gid)
+		_, err := api.RunCommand([]string{"groupmod", "-g", strconv.Itoa(to.Gid), username}, CmdOpts{})
 		if err != nil {
 			return err
 		}

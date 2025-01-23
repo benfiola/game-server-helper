@@ -1,4 +1,4 @@
-package context
+package common
 
 import (
 	"github.com/caarlos0/env/v11"
@@ -7,6 +7,6 @@ import (
 // Parses environment variables into the provided struct.
 // Returns an error if parsing the environment variables fail.
 // See: [env.Parse]
-func (ctx *Context) ParseEnv(cfg interface{}) error {
+func (api *Api) ParseEnv(cfg any) error {
 	return env.Parse(&cfg)
 }

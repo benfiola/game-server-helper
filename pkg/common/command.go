@@ -1,6 +1,7 @@
-package context
+package common
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 // CmdOpts defines the options used in conjunction with the [RunCommand] function
 type CmdOpts struct {
 	Attach        bool
+	Context       context.Context
 	Cwd           string
 	Env           []string
 	IgnoreSignals bool
@@ -18,12 +20,17 @@ type CmdOpts struct {
 
 // Runs a command (defined as a string slice) and returns the stdout.
 // Raises an error if the command fails.
-func (ctx *Context) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) {
+func (api *Api) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) {
 	fail := func(err error) (string, error) {
 		return "", err
 	}
 
-	currentUser, err := ctx.GetCurrentUser()
+	ctx := opts.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	currentUser, err := api.GetCurrentUser()
 	if err != nil {
 		return fail(err)
 	}
@@ -31,7 +38,7 @@ func (ctx *Context) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) 
 		cmdSlice = append([]string{"gosu", fmt.Sprintf("%d:%d", opts.User.Uid, opts.User.Gid)}, cmdSlice...)
 	}
 
-	ctx.Logger().Info("run cmd", "command", cmdSlice)
+	api.Logger.Info("run cmd", "command", cmdSlice)
 
 	stderrBuffer := strings.Builder{}
 	stdoutBuffer := strings.Builder{}
@@ -50,14 +57,14 @@ func (ctx *Context) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) 
 		command.Env = opts.Env
 	}
 	if !opts.IgnoreSignals {
-		ctx.HandleSignals(func(sig os.Signal) {
+		api.HandleSignals(func(sig os.Signal) {
 			command.Process.Signal(sig)
 		})
 	}
 
 	err = command.Run()
 	if err != nil && !opts.Attach {
-		ctx.Logger().Error("run cmd failed", "command", cmdSlice, "stderr", stderrBuffer.String())
+		api.Logger.Error("run cmd failed", "command", cmdSlice, "stderr", stderrBuffer.String())
 	}
 
 	return stdoutBuffer.String(), err

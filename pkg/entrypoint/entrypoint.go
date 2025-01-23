@@ -1,21 +1,21 @@
 package entrypoint
 
 import (
-	basecontext "context"
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 
-	"github.com/benfiola/game-server-helper/pkg/context"
+	"github.com/benfiola/game-server-helper/pkg/common"
 )
 
 // A callback is an entrypoint task ultimately invoked through [Entrypoint.RunCallback]
-type callback func(ctx context.Context) error
+type callback func(ctx context.Context, api common.Api) error
 
 // An Entrypoint wraps common tasks that need to be performed by many game server docker images.
 type Entrypoint struct {
 	Action      callback
-	Context     basecontext.Context
+	Context     context.Context
 	Directories []string
 	HealthCheck callback
 	Logger      *slog.Logger
@@ -30,7 +30,7 @@ func (e *Entrypoint) initialize() error {
 		return fmt.Errorf("entrypoint action must be defined")
 	}
 	if e.Context == nil {
-		e.Context = basecontext.Background()
+		e.Context = context.Background()
 	}
 	if e.Directories == nil {
 		e.Directories = []string{}
@@ -46,40 +46,40 @@ func (e *Entrypoint) initialize() error {
 
 // Creates a [context.Context] and runs the given [callback] with it.
 func (e *Entrypoint) runCallback(cb callback) error {
-	sctx := context.Context{Context: e.Context}
-	return cb(sctx)
+	api := common.Api{Logger: e.Logger}
+	return cb(e.Context, api)
 }
 
 // Runs the entrypoint action.
 // Returns an error if the entrypoint action fails.
-func (e *Entrypoint) action(ctx context.Context) error {
-	return e.runCallback(e.Action)
+func (e *Entrypoint) action(ctx context.Context, api common.Api) error {
+	return e.Action(ctx, api)
 }
 
 // 'Bootstraps' the entrypoint.
 // When run as root, the entrypoint will determine a non-root user, take ownership of necessary directories with this non-root user, and then relaunch the entrypoint as this non-root user.
 // When run as non-root, the entrypoint will relaunch itself.
-func (e *Entrypoint) bootstrap(ctx context.Context) error {
-	ctx.Logger().Info("bootstrap")
+func (e *Entrypoint) bootstrap(ctx context.Context, api common.Api) error {
+	api.Logger.Info("bootstrap")
 
-	runAsUser, err := ctx.GetCurrentUser()
+	runAsUser, err := api.GetCurrentUser()
 	if err != nil {
 		return err
 	}
 	currentUser := runAsUser
 
 	if currentUser.Uid == 0 {
-		runAsUser, err = ctx.GetEnvUser()
+		runAsUser, err = api.GetEnvUser()
 		if err != nil {
 			return err
 		}
 
-		err = ctx.UpdateUser("server", runAsUser)
+		err = api.UpdateUser("server", runAsUser)
 		if err != nil {
 			return err
 		}
 
-		err = ctx.SetOwnerForPaths(runAsUser, e.Directories...)
+		err = api.SetOwnerForPaths(runAsUser, e.Directories...)
 		if err != nil {
 			return err
 		}
@@ -90,13 +90,13 @@ func (e *Entrypoint) bootstrap(ctx context.Context) error {
 		return err
 	}
 
-	_, err = ctx.RunCommand([]string{executable, "action"}, context.CmdOpts{Attach: true, Env: os.Environ(), User: runAsUser})
+	_, err = api.RunCommand([]string{executable, "action"}, common.CmdOpts{Attach: true, Env: os.Environ(), User: runAsUser})
 	return err
 }
 
 // Runs the entrypoint health check.
 // Returns an error if the entrypoint health check fails.
-func (e *Entrypoint) healthCheck(ctx context.Context) error {
+func (e *Entrypoint) healthCheck(ctx context.Context, api common.Api) error {
 	if e.HealthCheck == nil {
 		return fmt.Errorf("entrypoint health check not defined")
 	}
@@ -105,7 +105,7 @@ func (e *Entrypoint) healthCheck(ctx context.Context) error {
 }
 
 // Prints the version
-func (e *Entrypoint) printVersion(ctx context.Context) error {
+func (e *Entrypoint) printVersion(ctx context.Context, api common.Api) error {
 	fmt.Print(e.Version)
 	return nil
 }

@@ -1,4 +1,4 @@
-package context
+package common
 
 import (
 	"fmt"
@@ -8,10 +8,10 @@ import (
 // Extracts a src archive to a dest folder.
 // Returns a failure if the archive type is unrecongized.
 // Returns a failure if the extract operation fails.
-func (ctx *Context) Extract(src string, dest string) error {
-	ctx.Logger().Info("extract", "src", src, "dest", dest)
+func (api *Api) Extract(src string, dest string) error {
+	api.Logger.Info("extract", "src", src, "dest", dest)
 
-	err := ctx.CreateDirs(dest)
+	err := api.CreateDirs(dest)
 	if err != nil {
 		return err
 	}
@@ -29,6 +29,6 @@ func (ctx *Context) Extract(src string, dest string) error {
 		return fmt.Errorf("unrecongized file type %s", src)
 	}
 
-	_, err = ctx.RunCommand(cmd, CmdOpts{})
+	_, err = api.RunCommand(cmd, CmdOpts{})
 	return err
 }

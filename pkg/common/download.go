@@ -1,4 +1,4 @@
-package context
+package common
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ type downloadCb func(path string) error
 // Downloads a url to a temporary file and invokes a callback with the path to the temporary file.
 // Returns an error if the download fails.
 // Returns an error if the callback returns an error.
-func (ctx *Context) Download(url string, cb downloadCb) error {
+func (api *Api) Download(url string, cb downloadCb) error {
 	tempDir, err := os.MkdirTemp("", "")
 	if err != nil {
 		return err
@@ -29,7 +29,7 @@ func (ctx *Context) Download(url string, cb downloadCb) error {
 	}
 	defer handle.Close()
 
-	ctx.Logger().Info("download", "url", url, "file", tempFile)
+	api.Logger.Info("download", "url", url, "file", tempFile)
 	response, err := http.Get(url)
 	if err != nil {
 		return err

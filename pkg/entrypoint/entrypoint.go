@@ -27,15 +27,15 @@ type Api struct {
 	Directories DirectoryMap
 }
 
-// A callback is an entrypoint task ultimately invoked through [Entrypoint.RunCallback]
-type callback func(ctx context.Context, api Api) error
+// A callback is an entrypoint task ultimately invoked through [Entrypoint.runCallback]
+type Callback func(ctx context.Context, api Api) error
 
 // An Entrypoint wraps common tasks that need to be performed by many game server docker images.
 type Entrypoint struct {
-	Action      callback
+	Action      Callback
 	Context     context.Context
 	Directories map[string]string
-	HealthCheck callback
+	HealthCheck Callback
 	Logger      *slog.Logger
 	Version     string
 }
@@ -63,7 +63,7 @@ func (e *Entrypoint) initialize() error {
 }
 
 // Creates a [context.Context] and runs the given [callback] with it.
-func (e *Entrypoint) runCallback(cb callback) error {
+func (e *Entrypoint) runCallback(cb Callback) error {
 	commonApi := common.Api{Logger: e.Logger}
 	api := Api{Api: commonApi, Directories: DirectoryMap(e.Directories)}
 	return cb(e.Context, api)

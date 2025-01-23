@@ -3,14 +3,16 @@ package helper
 import (
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
 // SignalHandler holds data required for a signal handler
 type SignalHandler struct {
 	Api             Api
+	HandlerLock     sync.Mutex
 	HandlerFinished chan bool
-	Signal          syscall.Signal
+	Signal          os.Signal
 	SignalChannel   chan os.Signal
 }
 
@@ -22,7 +24,7 @@ func (sh *SignalHandler) Stop() {
 // If a signal is caught, waits for the signal handler to complete.
 // If no signal is caught, is a no-op
 func (sh *SignalHandler) Wait() {
-	if sh.Signal == 0 {
+	if sh.Signal == nil {
 		return
 	}
 
@@ -44,11 +46,14 @@ func (api *Api) HandleSignals(cb signalHandlerCb) SignalHandler {
 	signal.Notify(sh.SignalChannel, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if sh.Signal != 0 {
+		sh.HandlerLock.Lock()
+		if sh.Signal != nil {
 			return
 		}
-
 		signal := <-sh.SignalChannel
+		sh.Signal = signal
+		sh.HandlerLock.Unlock()
+
 		api.Logger.Info("signal caught", "signal", signal)
 		cb(signal)
 		sh.HandlerFinished <- true

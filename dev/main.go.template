@@ -3,16 +3,16 @@ package main
 import (
 	"context"
 
-	"github.com/benfiola/game-server-helper/pkg/entrypoint"
+	"github.com/benfiola/game-server-helper/pkg/helper"
 )
 
-func Action(ctx context.Context, api entrypoint.Api) error {
+func Entrypoint(ctx context.Context, api helper.Api) error {
 	return nil
 }
 
 func main() {
-	(&entrypoint.Entrypoint{
-		Action:  Action,
-		Version: "0.0.0+undefined",
+	(&helper.Helper{
+		Entrypoint: Entrypoint,
+		Version:    "0.0.0+undefined",
 	}).Run()
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // CmdOpts defines the options used in conjunction with the [RunCommand] function
@@ -68,4 +69,96 @@ func (api *Api) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) {
 	}
 
 	return stdoutBuffer.String(), err
+}
+
+// cmdUntilCb is a callback that polls for a condition.  Once this condition is reached, the completion callback should be called.
+// Return an error to fail the [RunCommandUntil] function
+type cmdUntilCb func(complete func()) error
+
+// CmdUntilOpts defines the options used in conjunction with the [RunCommandUntil] function
+type CmdUntilOpts struct {
+	CmdOpts
+	Callback cmdUntilCb
+	Interval time.Duration
+	Timeout  time.Duration
+}
+
+// Runs a command until a condition (dictated by [CmdUntilOpts.Callback]) or a timeout is reached.
+// Returns a failure if the command fails.
+// Returns a failure if the callback fails.
+// Returns a failure if a timeout is reached.
+func (api *Api) RunCommandUntil(cmdSlice []string, opts CmdUntilOpts) error {
+	ctx := opts.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	interval := opts.Interval
+	if interval == 0 {
+		interval = 1 * time.Second
+	}
+	timeout := opts.Timeout
+	if timeout == 0 {
+		timeout = 120 * time.Second
+	}
+
+	start := time.Now()
+	sctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmdFinished := make(chan bool, 1)
+	var cmdErr error
+	go func() {
+		_, cmdErr = api.RunCommand(cmdSlice, CmdOpts{
+			Attach:        opts.Attach,
+			Context:       sctx,
+			Cwd:           opts.Cwd,
+			Env:           opts.Env,
+			IgnoreSignals: opts.IgnoreSignals,
+			User:          opts.User,
+		})
+		cmdFinished <- true
+	}()
+
+	var cbErr error
+	go func() {
+		ticker := time.NewTicker(interval)
+		for range ticker.C {
+			isCmdFinished := false
+			select {
+			case <-cmdFinished:
+				isCmdFinished = true
+			default:
+			}
+
+			if isCmdFinished {
+				break
+			}
+
+			cbErr = opts.Callback(cancel)
+
+			if cbErr != nil {
+				cancel()
+				break
+			}
+		}
+	}()
+
+	<-cmdFinished
+
+	select {
+	case <-sctx.Done():
+		cmdErr = nil
+	default:
+	}
+
+	if time.Since(start) > timeout {
+		cmdErr = fmt.Errorf("command timed out")
+	}
+
+	err := cbErr
+	if err == nil {
+		err = cmdErr
+	}
+
+	return err
 }

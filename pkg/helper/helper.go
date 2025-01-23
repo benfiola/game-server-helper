@@ -7,6 +7,19 @@ import (
 	"os"
 )
 
+// DirectoryMap stores a label to path mapping
+type DirectoryMap map[string]string
+
+// Returns a list of paths stored in the directory map
+func (dm *DirectoryMap) List() []string {
+	list := []string{}
+	for _, directory := range *dm {
+		list = append(list, directory)
+	}
+	return list
+}
+
+// Api is exposed to callbacks, providing helper functions to perform common operations
 type Api struct {
 	Logger      *slog.Logger
 	Directories DirectoryMap

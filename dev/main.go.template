@@ -1,0 +1,18 @@
+package main
+
+import (
+	"context"
+
+	"github.com/benfiola/game-server-helper/pkg/entrypoint"
+)
+
+func Action(ctx context.Context, api entrypoint.Api) error {
+	return nil
+}
+
+func main() {
+	(&entrypoint.Entrypoint{
+		Action:  Action,
+		Version: "0.0.0+undefined",
+	}).Run()
+}

@@ -138,8 +138,8 @@ func (e *Entrypoint) main(args ...string) error {
 	}
 
 	cmd := "bootstrap"
-	if len(args) > 0 {
-		cmd = args[0]
+	if len(args) >= 2 {
+		cmd = args[1]
 	}
 
 	switch cmd {

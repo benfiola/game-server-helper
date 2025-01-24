@@ -71,7 +71,14 @@ func (api *Api) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) {
 	cmdFinished <- true
 
 	if err != nil {
-		api.Logger.Error("run cmd failed", "command", cmdSlice, "stdout", stdoutBuffer.String(), "stderr", stderrBuffer.String())
+		truncate := func(b strings.Builder) string {
+			data := b.String()
+			if len(data) < 512 {
+				return data
+			}
+			return "..." + data[len(data)-509:]
+		}
+		api.Logger.Error("run cmd failed", "command", cmdSlice, "stderr", truncate(stderrBuffer), "stdout", truncate(stdoutBuffer))
 	}
 
 	return stdoutBuffer.String(), err

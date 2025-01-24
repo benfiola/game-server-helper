@@ -1,0 +1,47 @@
+package helperapi
+
+import (
+	"encoding/json"
+
+	jsonpatch "github.com/evanphx/json-patch/v5"
+)
+
+// JsonPatch represents an RFC6902 compilant JSON patch
+type JsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value,omitempty"`
+}
+
+// Applies a sequence of [JsonPatch] patches to a provided map, in place.
+// Returns an error if the patch operation fails.
+func (api *Api) ApplyJsonPatches(to any, patches ...JsonPatch) error {
+	for _, patch := range patches {
+		patchBytes, err := json.Marshal([]JsonPatch{patch})
+		if err != nil {
+			return err
+		}
+
+		toBytes, err := json.Marshal(to)
+		if err != nil {
+			return err
+		}
+
+		jsonPatch, err := jsonpatch.DecodePatch(patchBytes)
+		if err != nil {
+			return err
+		}
+
+		toBytes, err = jsonPatch.ApplyIndent(toBytes, "  ")
+		if err != nil {
+			return err
+		}
+
+		err = json.Unmarshal(toBytes, &to)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

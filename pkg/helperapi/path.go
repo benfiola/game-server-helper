@@ -22,6 +22,23 @@ func (api *Api) CreateDirs(paths ...string) error {
 	return nil
 }
 
+// Removes the provided paths
+// Returns an error if any paths fail to remove
+func (api *Api) RemovePaths(paths ...string) error {
+	for _, path := range paths {
+		_, err := os.Stat(path)
+		if !errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		api.Logger.Info("remove path", "path", path)
+		err = os.RemoveAll(path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Sets the owner for the given directories
 // Returns an error if any 'chown' operation fails
 func (api *Api) SetOwnerForPaths(owner User, paths ...string) error {

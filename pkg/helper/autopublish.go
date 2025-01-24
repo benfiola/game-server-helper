@@ -223,6 +223,8 @@ func (sc *SteamChecker) GetManifestId(appInfo map[string]any) (string, error) {
 	return manifestId, nil
 }
 
+const SteamCheckerKeyManifestId = "manifest_id"
+
 // Returns a data payload to be used with the autopublisher.
 // Returns an error if the data payload cannot be found.
 func (sc *SteamChecker) GetData() (map[string]any, error) {
@@ -239,7 +241,7 @@ func (sc *SteamChecker) GetData() (map[string]any, error) {
 		return fail(err)
 	}
 	return map[string]any{
-		"ManifestId": manifestId,
+		SteamCheckerKeyManifestId: manifestId,
 	}, nil
 }
 

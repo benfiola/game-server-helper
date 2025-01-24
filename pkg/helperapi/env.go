@@ -1,4 +1,4 @@
-package helper
+package helperapi
 
 import (
 	"github.com/caarlos0/env/v11"

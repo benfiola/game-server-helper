@@ -1,4 +1,4 @@
-package helper
+package helperapi
 
 import (
 	"context"
@@ -57,15 +57,21 @@ func (api *Api) RunCommand(cmdSlice []string, opts CmdOpts) (string, error) {
 	if opts.Env != nil {
 		command.Env = opts.Env
 	}
+	cmdFinished := make(chan bool, 1)
 	if !opts.IgnoreSignals {
-		api.HandleSignals(func(sig os.Signal) {
+		unregister := api.HandleSignal(func(sig os.Signal) {
+			api.Logger.Warn("signal caught during run cmd", "signal", sig.String())
 			command.Process.Signal(sig)
+			<-cmdFinished
 		})
+		defer unregister()
 	}
 
 	err = command.Run()
-	if err != nil && !opts.Attach {
-		api.Logger.Error("run cmd failed", "command", cmdSlice, "stderr", stderrBuffer.String())
+	cmdFinished <- true
+
+	if err != nil {
+		api.Logger.Error("run cmd failed", "command", cmdSlice, "stdout", stdoutBuffer.String(), "stderr", stderrBuffer.String())
 	}
 
 	return stdoutBuffer.String(), err
@@ -116,22 +122,15 @@ func (api *Api) RunCommandUntil(cmdSlice []string, opts CmdUntilOpts) error {
 			IgnoreSignals: opts.IgnoreSignals,
 			User:          opts.User,
 		})
-		api.Logger.Info("command finished")
 		cmdFinished <- true
 	}()
 
-	cbFinished := make(chan bool, 1)
 	var cbErr error
+	isCmdFinished := false
+	cbFinished := make(chan bool, 1)
 	go func() {
 		ticker := time.NewTicker(interval)
 		for range ticker.C {
-			isCmdFinished := false
-			select {
-			case <-cmdFinished:
-				isCmdFinished = true
-			default:
-			}
-
 			if isCmdFinished {
 				break
 			}
@@ -143,11 +142,10 @@ func (api *Api) RunCommandUntil(cmdSlice []string, opts CmdUntilOpts) error {
 				break
 			}
 		}
-		api.Logger.Info("callback finished")
 		cbFinished <- true
 	}()
 
-	<-cmdFinished
+	isCmdFinished = <-cmdFinished
 	<-cbFinished
 
 	select {

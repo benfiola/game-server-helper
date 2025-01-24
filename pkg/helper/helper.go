@@ -5,25 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/benfiola/game-server-helper/pkg/helperapi"
 )
-
-// DirectoryMap stores a label to path mapping
-type DirectoryMap map[string]string
-
-// Returns a list of paths stored in the directory map
-func (dm *DirectoryMap) List() []string {
-	list := []string{}
-	for _, directory := range *dm {
-		list = append(list, directory)
-	}
-	return list
-}
-
-// Api is exposed to callbacks, providing helper functions to perform common operations
-type Api struct {
-	Logger      *slog.Logger
-	Directories DirectoryMap
-}
 
 // A callback is an helper task ultimately invoked through [Helper.runCallback]
 type Callback func(ctx context.Context, api Api) error
@@ -39,9 +23,9 @@ type Helper struct {
 }
 
 // Initialies the helper - setting struct member defaults and validating others.
-// This is called automatically if [Helper.Main] is called.  Otherwise, it is expected that this function is called prior to calling any [Helper] methods.
+// This is called automatically if [Helper.Run] is called.  Otherwise, it is expected that this function is called prior to calling any [Helper] methods.
 // Returns an error if invalid arguments are provided to the [Helper].
-func (h *Helper) initialize() error {
+func (h *Helper) Initialize() error {
 	if h.Context == nil {
 		h.Context = context.Background()
 	}
@@ -61,21 +45,15 @@ func (h *Helper) initialize() error {
 }
 
 // Creates a [context.Context] and runs the given [callback] with it.
-func (h *Helper) runCallback(cb Callback) error {
-	api := Api{Directories: DirectoryMap(h.Directories), Logger: h.Logger}
+func (h *Helper) RunCallback(cb Callback) error {
+	api := Api{Api: helperapi.Api{Logger: h.Logger}, Directories: Map[string, string](h.Directories)}
 	return cb(h.Context, api)
-}
-
-// Runs the autopublisher.
-// Returns a failure if the attempt to autopublish fails.
-func (h *Helper) autopublish(ctx context.Context, api Api) error {
-	return nil
 }
 
 // 'Bootstraps' the entrypoint.
 // When run as root, will determine a non-root user, take ownership of necessary directories with this non-root user, and then relaunch the entrypoint as this non-root user.
 // When run as non-root, will directly launch the entrypoint as the non-root user.
-func (h *Helper) bootstrap(ctx context.Context, api Api) error {
+func (h *Helper) Bootstrap(ctx context.Context, api Api) error {
 	api.Logger.Info("bootstrap")
 
 	runAsUser, err := api.GetCurrentUser()
@@ -95,7 +73,7 @@ func (h *Helper) bootstrap(ctx context.Context, api Api) error {
 			return err
 		}
 
-		err = api.SetOwnerForPaths(runAsUser, api.Directories.List()...)
+		err = api.SetOwnerForPaths(runAsUser, api.Directories.Values()...)
 		if err != nil {
 			return err
 		}
@@ -106,36 +84,14 @@ func (h *Helper) bootstrap(ctx context.Context, api Api) error {
 		return err
 	}
 
-	_, err = api.RunCommand([]string{executable, "entrypoint"}, CmdOpts{Attach: true, Env: os.Environ(), User: runAsUser})
+	_, err = api.RunCommand([]string{executable, "entrypoint"}, helperapi.CmdOpts{Attach: true, Env: os.Environ(), User: runAsUser})
 	return err
-}
-
-// Runs the entrypoint.
-// Returns an error if the entrypoint action fails.
-func (h *Helper) entrypoint(ctx context.Context, api Api) error {
-	return h.Entrypoint(ctx, api)
-}
-
-// Runs the health check.
-// Returns an error if the health check fails.
-func (h *Helper) healthCheck(ctx context.Context, api Api) error {
-	if h.HealthCheck == nil {
-		return fmt.Errorf("health check not defined")
-	}
-
-	return h.runCallback(h.HealthCheck)
-}
-
-// Prints the version
-func (h *Helper) printVersion(ctx context.Context, api Api) error {
-	fmt.Print(h.Version)
-	return nil
 }
 
 // Runs the helper with the provided arguments.
 // Returns an error on failure.
 func (h *Helper) main(args ...string) error {
-	err := h.initialize()
+	err := h.Initialize()
 	if err != nil {
 		return err
 	}
@@ -146,16 +102,17 @@ func (h *Helper) main(args ...string) error {
 	}
 
 	switch cmd {
-	case "autopublish":
-		err = h.runCallback(h.autopublish)
 	case "bootstrap":
-		err = h.runCallback(h.bootstrap)
+		err = h.RunCallback(h.Bootstrap)
 	case "entrypoint":
-		err = h.runCallback(h.entrypoint)
+		err = h.RunCallback(h.Entrypoint)
 	case "health":
-		err = h.runCallback(h.healthCheck)
+		err = fmt.Errorf("health check not defined")
+		if h.HealthCheck != nil {
+			err = h.RunCallback(h.HealthCheck)
+		}
 	case "version":
-		err = h.runCallback(h.printVersion)
+		fmt.Print(h.Version)
 	default:
 		err = fmt.Errorf("unknown command %s", cmd)
 	}

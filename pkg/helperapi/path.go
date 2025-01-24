@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 // Creates the provided directories
@@ -22,13 +23,33 @@ func (api *Api) CreateDirs(paths ...string) error {
 	return nil
 }
 
+// Lists the subpaths in the given directory
+// Returns an error if the path is not a directory
+func (api *Api) ListDir(path string) ([]string, error) {
+	fail := func(err error) ([]string, error) {
+		return nil, err
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return fail(err)
+	}
+	paths := []string{}
+	for _, entry := range entries {
+		paths = append(paths, filepath.Join(path, entry.Name()))
+	}
+	return paths, nil
+}
+
 // Removes the provided paths
 // Returns an error if any paths fail to remove
 func (api *Api) RemovePaths(paths ...string) error {
 	for _, path := range paths {
 		_, err := os.Stat(path)
-		if !errors.Is(err, os.ErrNotExist) {
-			continue
+		if errors.Is(err, os.ErrNotExist) {
+			err = nil
+		}
+		if err != nil {
+			return err
 		}
 		api.Logger.Info("remove path", "path", path)
 		err = os.RemoveAll(path)

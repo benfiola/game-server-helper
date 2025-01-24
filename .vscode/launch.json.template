@@ -6,10 +6,7 @@
       "request": "launch",
       "mode": "debug",
       "program": "${workspaceFolder}/dev/main.go",
-      "cwd": "${workspaceFolder}",
-      "args": [
-        "action"
-      ]
+      "cwd": "${workspaceFolder}/dev"
     }
   ]
 }

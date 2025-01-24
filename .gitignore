@@ -1,2 +1,4 @@
-.vscode/launch.json
-dev/main.go
+.vscode/*
+!.vscode/launch.json.template
+dev/*
+!dev/main.go.template

@@ -14,13 +14,12 @@ type Callback func(ctx context.Context, api Api) error
 
 // An Helper wraps common tasks that need to be performed by many game server docker images.
 type Helper struct {
-	Autopublisher Autopublisher
-	Context       context.Context
-	Directories   map[string]string
-	Entrypoint    Callback
-	HealthCheck   Callback
-	Logger        *slog.Logger
-	Version       string
+	Context     context.Context
+	Directories map[string]string
+	Entrypoint  Callback
+	HealthCheck Callback
+	Logger      *slog.Logger
+	Version     string
 }
 
 // Initialies the helper - setting struct member defaults and validating others.
@@ -66,8 +65,6 @@ func (h *Helper) main(args ...string) error {
 
 	var callback Callback
 	switch cmd {
-	case "autopublish":
-		callback = h.Autopublish
 	case "bootstrap":
 		callback = h.Bootstrap
 	case "entrypoint":

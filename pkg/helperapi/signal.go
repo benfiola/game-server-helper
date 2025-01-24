@@ -20,6 +20,7 @@ func (api *Api) HandleSignal(cb SignalHandlerCb) SignalHandlerUnregister {
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		caught = <-channel
+		api.Logger.Info("signal caught", "signal", caught.String())
 		cb(caught)
 	}()
 

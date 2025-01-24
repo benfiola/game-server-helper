@@ -31,7 +31,7 @@ func (api *Api) SetOwnerForPaths(owner User, paths ...string) error {
 	}
 
 	for _, path := range paths {
-		api.Logger.Info("ensure directory ownership", "owner", owner, "path", path)
+		api.Logger.Info("set owner", "owner", owner, "path", path)
 		_, err = api.RunCommand([]string{"chown", "-R", fmt.Sprintf("%d:%d", owner.Uid, owner.Gid), path}, CmdOpts{})
 		if err != nil {
 			return err
@@ -44,6 +44,7 @@ func (api *Api) SetOwnerForPaths(owner User, paths ...string) error {
 // Creates a symlink from one path to another path.
 // Returns an error if the symlink operation fails.
 func (api *Api) SymlinkDir(from string, to string) error {
+	api.Logger.Info("create symlink", "from", from, "to", to)
 	err := os.MkdirAll(from, 0755)
 	if err != nil {
 		return err

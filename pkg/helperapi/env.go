@@ -8,5 +8,6 @@ import (
 // Returns an error if parsing the environment variables fail.
 // See: [env.Parse]
 func (api *Api) ParseEnv(cfg any) error {
+	api.Logger.Info("parse env")
 	return env.Parse(cfg)
 }

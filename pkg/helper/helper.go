@@ -14,12 +14,13 @@ type Callback func(ctx context.Context, api Api) error
 
 // An Helper wraps common tasks that need to be performed by many game server docker images.
 type Helper struct {
-	Context     context.Context
-	Directories map[string]string
-	Entrypoint  Callback
-	HealthCheck Callback
-	Logger      *slog.Logger
-	Version     string
+	Autopublisher Autopublisher
+	Context       context.Context
+	Directories   map[string]string
+	Entrypoint    Callback
+	HealthCheck   Callback
+	Logger        *slog.Logger
+	Version       string
 }
 
 // Initialies the helper - setting struct member defaults and validating others.
@@ -50,44 +51,6 @@ func (h *Helper) RunCallback(cb Callback) error {
 	return cb(h.Context, api)
 }
 
-// 'Bootstraps' the entrypoint.
-// When run as root, will determine a non-root user, take ownership of necessary directories with this non-root user, and then relaunch the entrypoint as this non-root user.
-// When run as non-root, will directly launch the entrypoint as the non-root user.
-func (h *Helper) Bootstrap(ctx context.Context, api Api) error {
-	api.Logger.Info("bootstrap")
-
-	runAsUser, err := api.GetCurrentUser()
-	if err != nil {
-		return err
-	}
-	currentUser := runAsUser
-
-	if currentUser.Uid == 0 {
-		runAsUser, err = api.GetEnvUser()
-		if err != nil {
-			return err
-		}
-
-		err = api.UpdateUser("server", runAsUser)
-		if err != nil {
-			return err
-		}
-
-		err = api.SetOwnerForPaths(runAsUser, api.Directories.Values()...)
-		if err != nil {
-			return err
-		}
-	}
-
-	executable, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
-	_, err = api.RunCommand([]string{executable, "entrypoint"}, helperapi.CmdOpts{Attach: true, Env: os.Environ(), User: runAsUser})
-	return err
-}
-
 // Runs the helper with the provided arguments.
 // Returns an error on failure.
 func (h *Helper) main(args ...string) error {
@@ -101,23 +64,23 @@ func (h *Helper) main(args ...string) error {
 		cmd = args[1]
 	}
 
+	var callback Callback
 	switch cmd {
+	case "autopublish":
+		callback = h.Autopublish
 	case "bootstrap":
-		err = h.RunCallback(h.Bootstrap)
+		callback = h.Bootstrap
 	case "entrypoint":
-		err = h.RunCallback(h.Entrypoint)
+		callback = h.EntrypointCallback
 	case "health":
-		err = fmt.Errorf("health check not defined")
-		if h.HealthCheck != nil {
-			err = h.RunCallback(h.HealthCheck)
-		}
+		callback = h.HealthCallback
 	case "version":
-		fmt.Print(h.Version)
+		callback = h.PrintVersion
 	default:
-		err = fmt.Errorf("unknown command %s", cmd)
+		return fmt.Errorf("unknown command %s", cmd)
 	}
 
-	return err
+	return h.RunCallback(callback)
 }
 
 // Runs the helper with the process arguments, and exits on completion.

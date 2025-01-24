@@ -67,3 +67,25 @@ func (api *Api) SymlinkDir(from string, to string) error {
 
 	return nil
 }
+
+// createTempDirCb is a callback invoked once a temporary directory is created via [CreateTempDir]
+type createTempDirCb func(path string) error
+
+// Creates a temporary directory and then invokes a callback with the created path.
+// Returns an error if the temporary directory fails to create.
+// Returns an error if the callback fails.
+func (api *Api) CreateTempDir(cb createTempDirCb) error {
+	dir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return err
+	}
+	api.Logger.Info("create temp dir", "path", dir)
+	defer os.RemoveAll(dir)
+
+	err = cb(dir)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

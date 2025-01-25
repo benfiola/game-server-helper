@@ -2,6 +2,8 @@ package helperapi
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 
 	jsonpatch "github.com/evanphx/json-patch/v5"
 )
@@ -16,7 +18,7 @@ type JsonPatch struct {
 // Applies a sequence of [JsonPatch] patches to a provided map, in place.
 // Returns an error if the patch operation fails.
 func (api *Api) ApplyJsonPatches(to any, patches ...JsonPatch) error {
-	if (reflect.ValueOf(to).Kind() != reflect.Ptr) {
+	if reflect.ValueOf(to).Kind() != reflect.Ptr {
 		return fmt.Errorf("to must be pointer")
 	}
 	api.Logger.Info("apply json patches", "count", len(patches))

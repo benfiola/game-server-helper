@@ -83,22 +83,22 @@ func (api *Api) SetOwnerForPaths(owner User, paths ...string) error {
 // Returns an error if the symlink operation fails.
 func (api *Api) SymlinkDir(from string, to string) error {
 	api.Logger.Info("create symlink", "from", from, "to", to)
-	err := os.MkdirAll(from, 0755)
+	err := os.MkdirAll(to, 0755)
 	if err != nil {
 		return err
 	}
 
-	err = os.RemoveAll(from)
+	err = os.RemoveAll(to)
 	if err != nil {
 		return err
 	}
 
-	err = os.MkdirAll(to, 0755)
+	err = os.MkdirAll(from, 0755)
 	if err != nil {
 		return err
 	}
 
-	err = os.Symlink(to, from)
+	err = os.Symlink(from, to)
 	if err != nil {
 		return err
 	}

@@ -12,6 +12,9 @@ import (
 // Returns an error if unmarshalling fails.
 // Returns an error if the file type is not recognized.
 func (api *Api) UnmarshalFile(file string, data any) error {
+	if (reflect.ValueOf(data).Kind() != reflect.Ptr) {
+		return fmt.Errorf("data must be pointer")
+	}
 	api.Logger.Info("unmarshal file", "path", file)
 	if strings.HasSuffix(file, ".json") {
 		return api.unmarshalJsonFile(file, data)

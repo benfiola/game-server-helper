@@ -1,26 +1,27 @@
-package helperapi
+package helper
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
-// SignalHandlerCb is the callback invoked by a signal handler
-type SignalHandlerCb func(sig os.Signal)
+// signalHandlerCb is the callback invoked by a signal handler
+type signalHandlerCb func(sig os.Signal)
 
-// SignalHandlerUnregister is the function that unregisters a registered callback
-type SignalHandlerUnregister func()
+// signalHandlerUnregister is the function that unregisters a registered callback
+type signalHandlerUnregister func()
 
 // Allows callers to attach signal handlers to common termination signals to perform cleanup.  Returns an function that unregisters the callback.
-func (api *Api) HandleSignal(cb SignalHandlerCb) SignalHandlerUnregister {
+func HandleSignal(ctx context.Context, cb signalHandlerCb) signalHandlerUnregister {
 	var caught os.Signal
 	channel := make(chan os.Signal, 1)
 
 	signal.Notify(channel, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		caught = <-channel
-		api.Logger.Info("signal caught", "signal", caught.String())
+		Logger(ctx).Info("signal caught", "signal", caught.String())
 		cb(caught)
 	}()
 

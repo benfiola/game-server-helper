@@ -2,17 +2,22 @@ package main
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 
-	"github.com/benfiola/game-server-helper/pkg/helper"
+	helper "github.com/benfiola/game-server-helper/pkg"
 )
 
-func Entrypoint(ctx context.Context, api helper.Api) error {
+func entrypoint(ctx context.Context) error {
 	return nil
 }
 
 func main() {
-	(&helper.Helper{
-		Entrypoint: Entrypoint,
-		Version:    "0.0.0+undefined",
+	wd, _ := os.Getwd()
+
+	(&helper.Entrypoint{
+		Dirs: map[string]string{},
+		Main:    entrypoint,
+		Version: "0.0.0+undefined",
 	}).Run()
 }

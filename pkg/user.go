@@ -1,7 +1,9 @@
-package helperapi
+package helper
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"os/user"
 	"strconv"
 
@@ -15,35 +17,14 @@ type User struct {
 }
 
 // Returns a [User] representing the current process' user
-// Returns an error if fetching the current user fails.
-// Returns an error if the resulting user has a non-numeric gid/uid.
-func (api *Api) GetCurrentUser() (User, error) {
-	fail := func(err error) (User, error) {
-		return User{}, err
-	}
-
-	current, err := user.Current()
-	if err != nil {
-		return fail(err)
-	}
-
-	gid, err := strconv.Atoi(current.Gid)
-	if err != nil {
-		return fail(err)
-	}
-
-	uid, err := strconv.Atoi(current.Uid)
-	if err != nil {
-		return fail(err)
-	}
-
-	return User{Gid: gid, Uid: uid}, nil
+func GetCurrentUser(ctx context.Context) User {
+	return User{Gid: os.Getgid(), Uid: os.Getuid()}
 }
 
 // Looks up a user by username and returns a [User].
 // Returns an error if the lookup fails.
 // Returns an error if the resulting user has a non-numeric gid/uid.
-func (api *Api) LookupUser(username string) (User, error) {
+func LookupUser(ctx context.Context, username string) (User, error) {
 	fail := func(err error) (User, error) {
 		return User{}, err
 	}
@@ -68,34 +49,34 @@ func (api *Api) LookupUser(username string) (User, error) {
 
 // Returns a [User] representing a gid/uid as set in the environment
 // Returns an error if the resulting user has a non-numeric gid/uid.
-func (api *Api) GetEnvUser() (User, error) {
+func GetEnvUser(ctx context.Context) (User, error) {
 	user := User{}
 	err := env.Parse(&user)
 	return user, err
 }
 
 // Updates the gid/uid of the given username
-func (api *Api) UpdateUser(username string, to User) error {
+func UpdateUser(ctx context.Context, username string, to User) error {
 	if to.Uid == 0 {
 		return fmt.Errorf("refusing to update username %s to uid 0", username)
 	}
 
-	from, err := api.LookupUser(username)
+	from, err := LookupUser(ctx, username)
 	if err != nil {
 		return err
 	}
 
 	if from.Uid != to.Uid {
-		api.Logger.Info("change uid", "user", username, "from", from.Uid, "to", to.Uid)
-		_, err := api.RunCommand([]string{"usermod", "-u", strconv.Itoa(to.Uid), username}, CmdOpts{})
+		Logger(ctx).Info("change uid", "user", username, "from", from.Uid, "to", to.Uid)
+		_, err := Command(ctx, []string{"usermod", "-u", strconv.Itoa(to.Uid), username}, CmdOpts{}).Run()
 		if err != nil {
 			return err
 		}
 	}
 
 	if from.Gid != to.Gid {
-		api.Logger.Info("change gid", "user", username, "from", from.Gid, "to", to.Gid)
-		_, err := api.RunCommand([]string{"groupmod", "-g", strconv.Itoa(to.Gid), username}, CmdOpts{})
+		Logger(ctx).Info("change gid", "user", username, "from", from.Gid, "to", to.Gid)
+		_, err := Command(ctx, []string{"groupmod", "-g", strconv.Itoa(to.Gid), username}, CmdOpts{}).Run()
 		if err != nil {
 			return err
 		}

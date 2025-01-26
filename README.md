@@ -5,7 +5,6 @@ This project aims to reduce the amount of boilerplate needed to create the docke
 Boilerplate, in this case, includes:
 
 - Wiring up a basic CLI for the entrypoint
-  - Provide hook for auto-publish behavior (if needed)
   - Provide hook for health checks (if needed)
   - Provide hook for entrypoint
   - Provide print version command
@@ -42,14 +41,12 @@ func Entrypoint(ctx context.Context, api helper.Api) error {
 
 func main() {
     (&helper.Entrypoint{
-        Directories: map[string]string{
+        Dirs: map[string]string{
             "server": "/server",
             "data": "/data",
         },
-        Entrypoint: Entrypoint,
-        HealthCheck: HealthCheck,
-        Version: "0.0.0"
+        Main: Entrypoint,
+        Version: "0.0.0",
     }).Run()
 }
-
 ```

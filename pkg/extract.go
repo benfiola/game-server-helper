@@ -1,6 +1,7 @@
-package helperapi
+package helper
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -8,10 +9,10 @@ import (
 // Extracts a src archive to a dest folder.
 // Returns a failure if the archive type is unrecongized.
 // Returns a failure if the extract operation fails.
-func (api *Api) Extract(src string, dest string) error {
-	api.Logger.Info("extract", "src", src, "dest", dest)
+func Extract(ctx context.Context, src string, dest string) error {
+	Logger(ctx).Info("extract", "src", src, "dest", dest)
 
-	err := api.CreateDirs(dest)
+	err := CreateDirs(ctx, dest)
 	if err != nil {
 		return err
 	}
@@ -29,6 +30,6 @@ func (api *Api) Extract(src string, dest string) error {
 		return fmt.Errorf("unrecongized file type %s", src)
 	}
 
-	_, err = api.RunCommand(cmd, CmdOpts{})
+	_, err = Command(ctx, cmd, CmdOpts{}).Run()
 	return err
 }

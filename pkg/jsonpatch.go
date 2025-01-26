@@ -1,6 +1,7 @@
-package helperapi
+package helper
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -17,11 +18,12 @@ type JsonPatch struct {
 
 // Applies a sequence of [JsonPatch] patches to a provided map, in place.
 // Returns an error if the patch operation fails.
-func (api *Api) ApplyJsonPatches(to any, patches ...JsonPatch) error {
+func ApplyJsonPatches(ctx context.Context, to any, patches ...JsonPatch) error {
 	if reflect.ValueOf(to).Kind() != reflect.Ptr {
 		return fmt.Errorf("to must be pointer")
 	}
-	api.Logger.Info("apply json patches", "count", len(patches))
+
+	Logger(ctx).Info("apply json patches", "count", len(patches))
 	patchesBytes, err := json.Marshal(patches)
 	if err != nil {
 		return err
@@ -42,10 +44,5 @@ func (api *Api) ApplyJsonPatches(to any, patches ...JsonPatch) error {
 		return err
 	}
 
-	err = json.Unmarshal(toBytes, &to)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return json.Unmarshal(toBytes, &to)
 }

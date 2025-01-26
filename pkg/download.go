@@ -1,6 +1,7 @@
-package helperapi
+package helper
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,8 +15,8 @@ type downloadCb func(path string) error
 // Downloads a url to a temporary file and invokes a callback with the path to the temporary file.
 // Returns an error if the download fails.
 // Returns an error if the callback returns an error.
-func (api *Api) Download(url string, cb downloadCb) error {
-	return api.CreateTempDir(func(tempDir string) error {
+func Download(ctx context.Context, url string, cb downloadCb) error {
+	return CreateTempDir(ctx, func(tempDir string) error {
 		baseName := filepath.Base(url)
 		tempFile := filepath.Join(tempDir, baseName)
 		handle, err := os.Create(tempFile)
@@ -24,7 +25,7 @@ func (api *Api) Download(url string, cb downloadCb) error {
 		}
 		defer handle.Close()
 
-		api.Logger.Info("download", "url", url, "file", tempFile)
+		Logger(ctx).Info("download", "url", url, "file", tempFile)
 		response, err := http.Get(url)
 		if err != nil {
 			return err

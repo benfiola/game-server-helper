@@ -16,7 +16,7 @@ import (
 const fileCacheVersion = "1"
 
 // fileCacheFetchCb is called during a 'put' to populate a destination path
-type fileCacheFetchCb func() (string, error)
+type fileCacheFetchCb func(tempDir string) (string, error)
 
 // fileCacheItem is an item within the cache
 type fileCacheItem struct {
@@ -186,46 +186,48 @@ func (fc *fileCache) pop(key string) error {
 func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 	defer fc.save()
 	fc.logger.Info("file cache put", "key", key)
-	src, err := fetchCb()
-	if err != nil {
-		return err
-	}
-	lstat, err := os.Lstat(src)
-	if err != nil {
-		return err
-	}
-	isFile := !lstat.IsDir()
-	sizeHint, err := GetPathSize(fc.ctx, src)
-	if err != nil {
-		return err
-	}
-	sizeHint = int(math.Round(float64(sizeHint) * .30))
-	err = fc.trim(sizeHint)
-	if err != nil {
-		return err
-	}
-	cachedSrc := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
-	_, err = Command(fc.ctx, []string{"mksquashfs", src, cachedSrc}, CmdOpts{}).Run()
-	if err != nil {
-		return err
-	}
-	err = fc.trim(0)
-	if err != nil {
-		return err
-	}
-	lstat, err = os.Lstat(cachedSrc)
-	if err != nil {
-		return err
-	}
-	fc.contents[key] = fileCacheItem{
-		IsFile:       isFile,
-		Key:          key,
-		LastAccessed: time.Now(),
-		LastUuid:     fc.uuid,
-		Path:         cachedSrc,
-		Size:         int(lstat.Size()),
-	}
-	return nil
+	return CreateTempDir(fc.ctx, func(tempDir string) error {
+		src, err := fetchCb(tempDir)
+		if err != nil {
+			return err
+		}
+		lstat, err := os.Lstat(src)
+		if err != nil {
+			return err
+		}
+		isFile := !lstat.IsDir()
+		sizeHint, err := GetPathSize(fc.ctx, src)
+		if err != nil {
+			return err
+		}
+		sizeHint = int(math.Round(float64(sizeHint) * .30))
+		err = fc.trim(sizeHint)
+		if err != nil {
+			return err
+		}
+		cachedSrc := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
+		_, err = Command(fc.ctx, []string{"mksquashfs", src, cachedSrc}, CmdOpts{}).Run()
+		if err != nil {
+			return err
+		}
+		err = fc.trim(0)
+		if err != nil {
+			return err
+		}
+		lstat, err = os.Lstat(cachedSrc)
+		if err != nil {
+			return err
+		}
+		fc.contents[key] = fileCacheItem{
+			IsFile:       isFile,
+			Key:          key,
+			LastAccessed: time.Now(),
+			LastUuid:     fc.uuid,
+			Path:         cachedSrc,
+			Size:         int(lstat.Size()),
+		}
+		return nil
+	})
 }
 
 // Sorting function that puts cache items with a current uuid at the end of the list, otherwise sorts by access times.

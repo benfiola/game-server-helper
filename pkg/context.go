@@ -13,10 +13,10 @@ func Dirs(ctx context.Context) Map[string, string] {
 	return ctx.Value(ctxKeyDirs{}).(Map[string, string])
 }
 
-// ctxKeyFileCacheSizeLimit is a context key pointing to a configured file cache size limit in bytes
+// ctxKeyFileCacheSizeLimit is a context key pointing to a configured file cache size limit in megabytes
 type ctxKeyFileCacheSizeLimit struct{}
 
-// Retrieves a file cache size limit (in bytes) from the given context
+// Retrieves a file cache size limit (in megabytes) from the given context
 func FileCacheSizeLimit(ctx context.Context) int {
 	return ctx.Value(ctxKeyFileCacheSizeLimit{}).(int)
 }

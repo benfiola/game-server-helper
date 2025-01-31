@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -245,7 +246,7 @@ func (fc *fileCache) getCacheSize() int {
 // Trims the cache to its configured size limit.  If an offset is provided, trims to (size limit + offset).
 // Returns an error if the trim operation fails.
 func (fc *fileCache) trim(offset int) error {
-	if fc.sizeLimit == 0 || fc.getCacheSize() < fc.sizeLimit {
+	if fc.sizeLimit == 0 {
 		return nil
 	}
 	sizeLimit := fc.sizeLimit - offset
@@ -253,6 +254,9 @@ func (fc *fileCache) trim(offset int) error {
 		return fmt.Errorf("size limit %d and offset %d results in negative number", fc.sizeLimit, offset)
 	}
 	size := fc.getCacheSize()
+	if size < sizeLimit {
+		return nil
+	}
 	items := fc.contents.Values()
 	slices.SortFunc(items, fc.itemSortFunc)
 	for size < sizeLimit && len(items) > 0 {
@@ -292,7 +296,7 @@ func CacheFile(ctx context.Context, key string, dest string, fetchCb fileCacheFe
 		Logger(ctx).Info("cache directory unset - bypassing file cache")
 		return fetchCb(dest)
 	}
-	fc := fileCache{ctx: ctx, dir: cacheDir, logger: Logger(ctx), sizeLimit: FileCacheSizeLimit(ctx), uuid: Uuid(ctx)}
+	fc := fileCache{ctx: ctx, dir: cacheDir, logger: Logger(ctx), sizeLimit: FileCacheSizeLimit(ctx) * int(math.Pow10(6)), uuid: Uuid(ctx)}
 	err := fc.initialize()
 	if err != nil {
 		return err

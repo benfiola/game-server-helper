@@ -24,7 +24,7 @@ type command struct {
 }
 
 // Truncates a string (replacing the excess with leading ellipses)
-func cmdStringTruncate(data string, limit int) string {
+func cmdTruncateString(data string, limit int) string {
 	if len(data) < limit {
 		return data
 	}
@@ -107,7 +107,7 @@ func (cmd *command) Run() (string, error) {
 	if err == nil {
 		err = cmdErr
 		if err != nil {
-			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", cmdStringTruncate(stdout, 128), "stdout", cmdStringTruncate(stdout, 128))
+			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", cmdTruncateString(stderr, 128), "stdout", cmdTruncateString(stdout, 128))
 		}
 	}
 

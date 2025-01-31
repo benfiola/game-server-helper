@@ -23,6 +23,15 @@ type command struct {
 	until         cmdUntilCb
 }
 
+// Truncates a string (replacing the excess with leading ellipses)
+func cmdStringTruncate(data string, limit int) string {
+	if len(data) < limit {
+		return data
+	}
+	offset := len(data) - limit + 3
+	return fmt.Sprintf("...%s", data[offset:])
+}
+
 // Runs the assembled command.
 // Returns an error if the command exits with a non-zero exit code.
 func (cmd *command) Run() (string, error) {
@@ -98,7 +107,7 @@ func (cmd *command) Run() (string, error) {
 	if err == nil {
 		err = cmdErr
 		if err != nil {
-			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", stderr, "stdout", stdout)
+			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", cmdStringTruncate(stdout, 128), "stdout", cmdStringTruncate(stdout, 128))
 		}
 	}
 

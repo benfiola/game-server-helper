@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/google/uuid"
 )
 
@@ -17,7 +18,7 @@ type Entrypoint struct {
 	CheckHealth        entrypointCb
 	ctx                context.Context
 	Dirs               Map[string, string]
-	FileCacheSizeLimit int
+	FileCacheSizeLimit int `env:"CACHE_SIZE_LIMIT"`
 	Initialize         func(ctx context.Context) error
 	logger             *slog.Logger
 	Main               entrypointCb
@@ -60,6 +61,10 @@ func bootstrap(ctx context.Context) error {
 
 // Initialies the entrypoint - setting defaults and validating fields.
 func (e *Entrypoint) initialize() error {
+	err := env.Parse(e)
+	if err != nil {
+		return err
+	}
 	e.ctx = context.Background()
 	if e.Dirs == nil {
 		e.Dirs = Map[string, string]{}

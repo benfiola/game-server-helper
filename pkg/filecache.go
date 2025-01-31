@@ -99,7 +99,7 @@ func (fc *fileCache) get(key string, dest string) error {
 	if item.IsFile {
 		unsquashPath = filepath.Dir(unsquashPath)
 	}
-	_, err = Command(fc.ctx, []string{"unsquashfs", "-dest", unsquashPath, item.Path}, CmdOpts{}).Run()
+	_, err := Command(fc.ctx, []string{"unsquashfs", "-dest", unsquashPath, item.Path}, CmdOpts{}).Run()
 	if err != nil {
 		return err
 	}
@@ -292,12 +292,13 @@ func CacheFile(ctx context.Context, key string, dest string, fetchCb fileCacheFe
 		Logger(ctx).Info("cache directory unset - bypassing file cache")
 		return fetchCb(dest)
 	}
-
 	fc := fileCache{ctx: ctx, dir: cacheDir, logger: Logger(ctx), sizeLimit: FileCacheSizeLimit(ctx), uuid: Uuid(ctx)}
 	err := fc.initialize()
 	if err != nil {
 		return err
 	}
-
+	if fc.hasKey(key) {
+		return fc.get(key, dest)
+	}
 	return fc.put(key, dest, fetchCb)
 }

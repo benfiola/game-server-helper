@@ -19,7 +19,8 @@ type Entrypoint struct {
 	CheckHealth        entrypointCb
 	ctx                context.Context
 	Dirs               Map[string, string]
-	FileCacheSizeLimit int `env:"CACHE_SIZE_LIMIT"`
+	FileCacheEnabled   bool `env:"CACHE_ENABLED"`
+	FileCacheSizeLimit int  `env:"CACHE_SIZE_LIMIT"`
 	Initialize         func(ctx context.Context) error
 	logger             *slog.Logger
 	Main               entrypointCb
@@ -90,6 +91,7 @@ func (e *Entrypoint) initialize() error {
 	}
 
 	e.ctx = context.WithValue(e.ctx, ctxKeyDirs{}, e.Dirs)
+	e.ctx = context.WithValue(e.ctx, ctxKeyFileCacheEnabled{}, e.FileCacheEnabled)
 	e.ctx = context.WithValue(e.ctx, ctxKeyFileCacheSizeLimit{}, e.FileCacheSizeLimit)
 	e.ctx = context.WithValue(e.ctx, ctxKeyLogger{}, e.logger)
 	e.ctx = context.WithValue(e.ctx, ctxKeyUuid{}, e.uuid)

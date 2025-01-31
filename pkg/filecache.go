@@ -297,6 +297,10 @@ func (fc *fileCache) save() error {
 // If the key does exist, the data is fetched from cache.
 // Returns an error if any file cache operation fails.
 func CacheFile(ctx context.Context, key string, dest string, fetchCb fileCacheFetchCb) error {
+	if !FileCacheEnabled(ctx) {
+		Logger(ctx).Info("cache disabled - bypassing file cache")
+		return fetchCb(dest)
+	}
 	cacheDir, ok := Dirs(ctx)["cache"]
 	if !ok {
 		Logger(ctx).Info("cache directory unset - bypassing file cache")

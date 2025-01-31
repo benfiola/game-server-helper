@@ -13,6 +13,14 @@ func Dirs(ctx context.Context) Map[string, string] {
 	return ctx.Value(ctxKeyDirs{}).(Map[string, string])
 }
 
+// ctxKeyFileCacheEnabled is a context key pointing boolean determining whether file caching is enabled
+type ctxKeyFileCacheEnabled struct{}
+
+// Retrieves a boolean indicating whether file caching is enabled
+func FileCacheEnabled(ctx context.Context) bool {
+	return ctx.Value(ctxKeyFileCacheEnabled{}).(int)
+}
+
 // ctxKeyFileCacheSizeLimit is a context key pointing to a configured file cache size limit in megabytes
 type ctxKeyFileCacheSizeLimit struct{}
 

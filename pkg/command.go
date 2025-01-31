@@ -42,8 +42,14 @@ func (cmd *command) Run() (string, error) {
 			})
 		}
 		cmdErr = cmd.execCmd.Run()
-		stdout = cmd.execCmd.Stdout.(*strings.Builder).String()
-		stderr = cmd.execCmd.Stderr.(*strings.Builder).String()
+		stdoutBuf, ok := cmd.execCmd.Stdout.(*strings.Builder)
+		if ok {
+			stdout = stdoutBuf.String()
+		}
+		stderrBuf, ok := cmd.execCmd.Stderr.(*strings.Builder)
+		if ok {
+			stderr = stderrBuf.String()
+		}
 		cmdFinished <- true
 	}()
 

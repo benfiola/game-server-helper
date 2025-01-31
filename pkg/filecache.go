@@ -96,11 +96,17 @@ func (fc *fileCache) get(key string, dest string) error {
 	if !ok {
 		return fmt.Errorf("key not found %s", key)
 	}
-	unsquashPath := dest
+	unsquashRoot := dest
 	if item.IsFile {
-		unsquashPath = filepath.Dir(unsquashPath)
+		// files added to a squashfs are placed in a root folder
+		// thus, to place the file at dest, unsquash to dest's parent folder
+		unsquashRoot = filepath.Dir(unsquashRoot)
 	}
-	_, err := Command(fc.ctx, []string{"unsquashfs", "-force", "-dest", unsquashPath, item.Path}, CmdOpts{}).Run()
+	err := CreateDirs(fc.ctx, filepath.Dir(unsquashRoot))
+	if err != nil {
+		return err
+	}
+	_, err = Command(fc.ctx, []string{"unsquashfs", "-force", "-dest", unsquashRoot, item.Path}, CmdOpts{}).Run()
 	if err != nil {
 		return err
 	}
@@ -200,7 +206,7 @@ func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 		if err != nil {
 			return err
 		}
-		sizeHint = int(math.Round(float64(sizeHint) * .30))
+		sizeHint = int(math.Round(float64(sizeHint) * .85))
 		err = fc.trim(sizeHint)
 		if err != nil {
 			return err
@@ -270,11 +276,11 @@ func (fc *fileCache) trim(offset int) error {
 	items := fc.contents.Values()
 	slices.SortFunc(items, fc.itemSortFunc)
 	for currentSize > desiredSize && len(items) > 0 {
-		fc.logger.Info("trim cache iteration", "count", len(items), "currentSize", currentSize, "desiredSize", desiredSize)
 		item := items[0]
 		items = items[1:]
+		fc.logger.Info("trim cache iteration", "current", currentSize, "desired", desiredSize, "key", item.Key)
 		if item.LastUuid == fc.uuid {
-			fc.logger.Info("stopping search - item with current uuid found", "key", item.Key)
+			fc.logger.Info("stop iteration - current uuid found", "key", item.Key)
 			break
 		}
 		err := fc.pop(item.Key)
@@ -284,7 +290,7 @@ func (fc *fileCache) trim(offset int) error {
 		currentSize -= item.Size
 	}
 	if currentSize >= desiredSize {
-		return fmt.Errorf("current size %d is greater than desired size %d with nothing left to trim", currentSize, desiredSize)
+		return fmt.Errorf("trim failed - %d > %d", currentSize, desiredSize)
 	}
 	return nil
 }
@@ -296,19 +302,67 @@ func (fc *fileCache) save() error {
 	return MarshalFile(fc.ctx, data, fc.getManifestPath())
 }
 
+// Performs a passthrough (i.e., fetches a path to dest)
+// Returns an error if the passthrough fails
+func fileCachePassthrough(ctx context.Context, dest string, fetchCb fileCacheFetchCb) error {
+	return CreateTempDir(ctx, func(tempDir string) error {
+		Logger(ctx).Info("cache passthrough", "dir", tempDir)
+		src, err := fetchCb(tempDir)
+		if err != nil {
+			return err
+		}
+		lstat, err := os.Lstat(src)
+		if err != nil {
+			return err
+		}
+		if lstat.IsDir() {
+			err = CreateDirs(ctx, dest)
+			if err != nil {
+				return err
+			}
+			srcDev, err := GetPathDevice(ctx, src)
+			if err != nil {
+				return err
+			}
+			destDev, err := GetPathDevice(ctx, dest)
+			if err != nil {
+				return err
+			}
+			cmd := []string{"cp", "-R"}
+			if destDev != 0 && destDev == srcDev {
+				// attempt hardlink if copy is not cross-device
+				cmd = append(cmd, "-fl")
+			}
+			cmd = append(cmd, fmt.Sprintf("%s/.", src), dest)
+			_, err = Command(ctx, cmd, CmdOpts{}).Run()
+			return err
+		} else {
+			err := CreateDirs(ctx, filepath.Dir(dest))
+			if err != nil {
+				return err
+			}
+			_, err = Command(ctx, []string{"mv", src, dest}, CmdOpts{}).Run()
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // Caches a function by key on-disk.
 // If the key does not exist, the fetch callback is called
 // If the key does exist, the data is fetched from cache.
 // Returns an error if any file cache operation fails.
 func CacheFile(ctx context.Context, key string, dest string, fetchCb fileCacheFetchCb) error {
 	if !FileCacheEnabled(ctx) {
-		Logger(ctx).Info("cache disabled - bypassing file cache")
-		return fetchCb(dest)
+		Logger(ctx).Info("cache disabled")
+		return fileCachePassthrough(ctx, dest, fetchCb)
 	}
 	cacheDir, ok := Dirs(ctx)["cache"]
 	if !ok {
-		Logger(ctx).Info("cache directory unset - bypassing file cache")
-		return fetchCb(dest)
+		Logger(ctx).Info("cache directory unset")
+		return fileCachePassthrough(ctx, dest, fetchCb)
 	}
 	fc := fileCache{ctx: ctx, dir: cacheDir, logger: Logger(ctx), sizeLimit: FileCacheSizeLimit(ctx) * int(math.Pow10(6)), uuid: Uuid(ctx)}
 	err := fc.initialize()

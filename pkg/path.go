@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // Creates the provided directories
@@ -38,6 +39,24 @@ func CreateTempDir(ctx context.Context, cb createTempDirCb) error {
 	Logger(ctx).Info("create temp dir", "path", dir)
 	defer os.RemoveAll(dir)
 	return cb(dir)
+}
+
+// Gets the device id of the given path.
+// Returns 0 if the device id cannot be obtained.
+// Returns an error if the path lstat fails
+func GetPathDevice(ctx context.Context, path string) (int, error) {
+	fail := func(err error) (int, error) {
+		return 0, err
+	}
+	lstat, err := os.Lstat(path)
+	if err != nil {
+		return fail(err)
+	}
+	lstatSys, ok := lstat.Sys().(*syscall.Stat_t)
+	if !ok {
+		return 0, nil
+	}
+	return int(lstatSys.Dev), nil
 }
 
 // Gets the size of the provided path in bytes

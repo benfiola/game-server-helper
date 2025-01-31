@@ -18,7 +18,7 @@ type ctxKeyFileCacheEnabled struct{}
 
 // Retrieves a boolean indicating whether file caching is enabled
 func FileCacheEnabled(ctx context.Context) bool {
-	return ctx.Value(ctxKeyFileCacheEnabled{}).(int)
+	return ctx.Value(ctxKeyFileCacheEnabled{}).(bool)
 }
 
 // ctxKeyFileCacheSizeLimit is a context key pointing to a configured file cache size limit in megabytes

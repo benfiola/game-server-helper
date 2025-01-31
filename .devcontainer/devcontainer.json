@@ -32,6 +32,7 @@
         "git",
         "gosu",
         "p7zip-full",
+        "squashfs-tools",
         "tar",
         "unzip",
         "vim"

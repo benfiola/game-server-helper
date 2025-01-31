@@ -16,7 +16,7 @@ import (
 const fileCacheVersion = "1"
 
 // fileCacheFetchCb is called during a 'put' to populate a destination path
-type fileCacheFetchCb func(string) error
+type fileCacheFetchCb func(tempDir string) error
 
 // fileCacheItem is an item within the cache
 type fileCacheItem struct {
@@ -187,17 +187,16 @@ func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 	defer fc.save()
 	fc.logger.Info("file cache put", "key", key)
 	return CreateTempDir(fc.ctx, func(tempDir string) error {
-		dest := filepath.Join("dest")
-		err := fetchCb(dest)
+		err := fetchCb(tempDir)
 		if err != nil {
 			return err
 		}
-		lstat, err := os.Lstat(dest)
+		lstat, err := os.Lstat(tempDir)
 		if err != nil {
 			return err
 		}
 		isFile := !lstat.IsDir()
-		sizeHint, err := GetPathSize(fc.ctx, dest)
+		sizeHint, err := GetPathSize(fc.ctx, tempDir)
 		if err != nil {
 			return err
 		}
@@ -207,7 +206,7 @@ func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 			return err
 		}
 		path := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
-		_, err = Command(fc.ctx, []string{"mksquashfs", dest, path}, CmdOpts{}).Run()
+		_, err = Command(fc.ctx, []string{"mksquashfs", tempDir, path}, CmdOpts{}).Run()
 		if err != nil {
 			return err
 		}

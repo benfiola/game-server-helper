@@ -259,7 +259,7 @@ func (fc *fileCache) trim(offset int) error {
 	}
 	items := fc.contents.Values()
 	slices.SortFunc(items, fc.itemSortFunc)
-	for size < sizeLimit && len(items) > 0 {
+	for size > sizeLimit && len(items) > 0 {
 		fc.logger.Info("trim cache iteration", "count", len(items), "limit", sizeLimit, "size", size)
 		item := items[0]
 		items = items[1:]

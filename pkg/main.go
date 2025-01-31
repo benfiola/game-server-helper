@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/google/uuid"
@@ -68,6 +69,16 @@ func (e *Entrypoint) initialize() error {
 	e.ctx = context.Background()
 	if e.Dirs == nil {
 		e.Dirs = Map[string, string]{}
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	for key, path := range e.Dirs {
+		if filepath.IsAbs(path) {
+			continue
+		}
+		e.Dirs[key] = filepath.Join(wd, path)
 	}
 	e.logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
 	if e.Main == nil {

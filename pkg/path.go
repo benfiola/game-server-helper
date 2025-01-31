@@ -147,17 +147,17 @@ func SetOwnerForPaths(ctx context.Context, owner User, paths ...string) error {
 // Returns an error if the symlink operation fails.
 func SymlinkDir(ctx context.Context, from string, to string) error {
 	Logger(ctx).Info("create symlink", "from", from, "to", to)
-	err := os.MkdirAll(to, 0755)
+	err := CreateDirs(ctx, to)
 	if err != nil {
 		return err
 	}
 
-	err = os.RemoveAll(to)
+	err = RemovePaths(ctx, to)
 	if err != nil {
 		return err
 	}
 
-	err = os.MkdirAll(from, 0755)
+	err = CreateDirs(ctx, from)
 	if err != nil {
 		return err
 	}

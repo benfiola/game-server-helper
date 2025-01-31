@@ -16,7 +16,7 @@ import (
 const fileCacheVersion = "1"
 
 // fileCacheFetchCb is called during a 'put' to populate a destination path
-type fileCacheFetchCb func(tempDir string) (string, error)
+type fileCacheFetchCb func(path string) error
 
 // fileCacheItem is an item within the cache
 type fileCacheItem struct {
@@ -96,21 +96,26 @@ func (fc *fileCache) get(key string, dest string) error {
 	if !ok {
 		return fmt.Errorf("key not found %s", key)
 	}
-	unsquashRoot := dest
 	if item.IsFile {
-		// files added to a squashfs are placed in a root folder
-		// thus, to place the file at dest, unsquash to dest's parent folder
-		unsquashRoot = filepath.Dir(unsquashRoot)
+		err := CreateDirs(fc.ctx, filepath.Dir(dest))
+		if err != nil {
+			return err
+		}
+		_, err = Command(fc.ctx, []string{"sh", "-c", fmt.Sprintf("unsquashfs -cat %s /path > %s", item.Path, dest)}, CmdOpts{}).Run()
+		if err != nil {
+			return err
+		}
+	} else {
+		err := CreateDirs(fc.ctx, dest)
+		if err != nil {
+			return err
+		}
+		_, err = Command(fc.ctx, []string{"unsquashfs", "-force", "-dest", dest, item.Path}, CmdOpts{}).Run()
+		if err != nil {
+			return err
+		}
 	}
-	err := CreateDirs(fc.ctx, filepath.Dir(unsquashRoot))
-	if err != nil {
-		return err
-	}
-	_, err = Command(fc.ctx, []string{"unsquashfs", "-force", "-dest", unsquashRoot, item.Path}, CmdOpts{}).Run()
-	if err != nil {
-		return err
-	}
-	_, err = os.Lstat(dest)
+	_, err := os.Lstat(dest)
 	if err != nil {
 		return err
 	}
@@ -193,7 +198,8 @@ func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 	defer fc.save()
 	fc.logger.Info("file cache put", "key", key)
 	return CreateTempDir(fc.ctx, func(tempDir string) error {
-		src, err := fetchCb(tempDir)
+		src := filepath.Join(tempDir, "path")
+		err := fetchCb(src)
 		if err != nil {
 			return err
 		}
@@ -307,46 +313,12 @@ func (fc *fileCache) save() error {
 func fileCachePassthrough(ctx context.Context, dest string, fetchCb fileCacheFetchCb) error {
 	return CreateTempDir(ctx, func(tempDir string) error {
 		Logger(ctx).Info("cache passthrough", "dir", tempDir)
-		src, err := fetchCb(tempDir)
+		err := fetchCb(dest)
 		if err != nil {
 			return err
 		}
-		lstat, err := os.Lstat(src)
-		if err != nil {
-			return err
-		}
-		if lstat.IsDir() {
-			err = CreateDirs(ctx, dest)
-			if err != nil {
-				return err
-			}
-			srcDev, err := GetPathDevice(ctx, src)
-			if err != nil {
-				return err
-			}
-			destDev, err := GetPathDevice(ctx, dest)
-			if err != nil {
-				return err
-			}
-			cmd := []string{"cp", "-R"}
-			if destDev != 0 && destDev == srcDev {
-				// attempt hardlink if copy is not cross-device
-				cmd = append(cmd, "-fl")
-			}
-			cmd = append(cmd, fmt.Sprintf("%s/.", src), dest)
-			_, err = Command(ctx, cmd, CmdOpts{}).Run()
-			return err
-		} else {
-			err := CreateDirs(ctx, filepath.Dir(dest))
-			if err != nil {
-				return err
-			}
-			_, err = Command(ctx, []string{"mv", src, dest}, CmdOpts{}).Run()
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+		_, err = os.Lstat(dest)
+		return err
 	})
 }
 

@@ -100,7 +100,7 @@ func (fc *fileCache) get(key string, dest string) error {
 	if item.IsFile {
 		unsquashPath = filepath.Dir(unsquashPath)
 	}
-	_, err := Command(fc.ctx, []string{"unsquashfs", "-dest", unsquashPath, item.Path}, CmdOpts{}).Run()
+	_, err := Command(fc.ctx, []string{"unsquashfs", "-force", "-dest", unsquashPath, item.Path}, CmdOpts{}).Run()
 	if err != nil {
 		return err
 	}

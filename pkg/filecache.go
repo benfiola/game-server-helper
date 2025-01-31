@@ -95,10 +95,6 @@ func (fc *fileCache) get(key string, dest string) error {
 	if !ok {
 		return fmt.Errorf("key not found %s", key)
 	}
-	err := RemovePaths(fc.ctx, dest)
-	if err != nil {
-		return err
-	}
 	unsquashPath := dest
 	if item.IsFile {
 		unsquashPath = filepath.Dir(unsquashPath)

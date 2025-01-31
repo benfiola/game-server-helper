@@ -183,41 +183,48 @@ func (fc *fileCache) pop(key string) error {
 
 // Puts an item (by key) into the cache.
 // Returns an error if the put operation fails.
-func (fc *fileCache) put(key string, dest string, fetchCb fileCacheFetchCb) error {
+func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 	defer fc.save()
-	fc.logger.Info("file cache put", "key", key, "dest", dest)
-	err := fetchCb(dest)
-	if err != nil {
-		return err
-	}
-	lstat, err := os.Lstat(dest)
-	if err != nil {
-		return err
-	}
-	err = fc.trim(int(lstat.Size()))
-	if err != nil {
-		return err
-	}
-	path := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
-	isFile := !lstat.IsDir()
-	_, err = Command(fc.ctx, []string{"mksquashfs", dest, path}, CmdOpts{}).Run()
-	if err != nil {
-		return err
-	}
-	lstat, err = os.Lstat(path)
-	if err != nil {
-		return err
-	}
-	fc.contents[key] = fileCacheItem{
-		IsFile:       isFile,
-		Key:          key,
-		LastAccessed: time.Now(),
-		LastUuid:     fc.uuid,
-		Path:         path,
-		Size:         int(lstat.Size()),
-	}
-
-	return nil
+	fc.logger.Info("file cache put", "key", key)
+	return CreateTempDir(fc.ctx, func(tempDir string) error {
+		dest := filepath.Join("dest")
+		err := fetchCb(dest)
+		if err != nil {
+			return err
+		}
+		lstat, err := os.Lstat(dest)
+		if err != nil {
+			return err
+		}
+		isFile := !lstat.IsDir()
+		sizeHint, err := GetPathSize(fc.ctx, dest)
+		if err != nil {
+			return err
+		}
+		sizeHint = int(math.Round(float64(sizeHint) * .30))
+		err = fc.trim(sizeHint)
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
+		_, err = Command(fc.ctx, []string{"mksquashfs", dest, path}, CmdOpts{}).Run()
+		if err != nil {
+			return err
+		}
+		lstat, err = os.Lstat(path)
+		if err != nil {
+			return err
+		}
+		fc.contents[key] = fileCacheItem{
+			IsFile:       isFile,
+			Key:          key,
+			LastAccessed: time.Now(),
+			LastUuid:     fc.uuid,
+			Path:         path,
+			Size:         int(lstat.Size()),
+		}
+		return nil
+	})
 }
 
 // Sorting function that puts cache items with a current uuid at the end of the list, otherwise sorts by access times.
@@ -249,32 +256,32 @@ func (fc *fileCache) trim(offset int) error {
 	if fc.sizeLimit == 0 {
 		return nil
 	}
-	sizeLimit := fc.sizeLimit - offset
-	if sizeLimit < 0 {
-		return fmt.Errorf("size limit %d and offset %d results in negative number", fc.sizeLimit, offset)
+	desiredSize := fc.sizeLimit - offset
+	if desiredSize < 0 {
+		return fmt.Errorf("desired size is negative number (%d - %d)", fc.sizeLimit, offset)
 	}
-	size := fc.getCacheSize()
-	if size < sizeLimit {
+	currentSize := fc.getCacheSize()
+	if currentSize < desiredSize {
 		return nil
 	}
 	items := fc.contents.Values()
 	slices.SortFunc(items, fc.itemSortFunc)
-	for size > sizeLimit && len(items) > 0 {
-		fc.logger.Info("trim cache iteration", "count", len(items), "limit", sizeLimit, "size", size)
+	for currentSize > desiredSize && len(items) > 0 {
+		fc.logger.Info("trim cache iteration", "count", len(items), "currentSize", currentSize, "desiredSize", desiredSize)
 		item := items[0]
 		items = items[1:]
 		if item.LastUuid == fc.uuid {
-			fc.logger.Info("stopping search", "key", item.Key, "reason", "current uuid")
+			fc.logger.Info("stopping search - item with current uuid found", "key", item.Key)
 			break
 		}
 		err := fc.pop(item.Key)
 		if err != nil {
 			return err
 		}
-		size -= item.Size
+		currentSize -= item.Size
 	}
-	if size >= sizeLimit {
-		return fmt.Errorf("trim cache failed: %d < %d", size, sizeLimit)
+	if currentSize >= desiredSize {
+		return fmt.Errorf("current size %d is greater than desired size %d with nothing left to trim", currentSize, desiredSize)
 	}
 	return nil
 }
@@ -301,8 +308,11 @@ func CacheFile(ctx context.Context, key string, dest string, fetchCb fileCacheFe
 	if err != nil {
 		return err
 	}
-	if fc.hasKey(key) {
-		return fc.get(key, dest)
+	if !fc.hasKey(key) {
+		err := fc.put(key, fetchCb)
+		if err != nil {
+			return err
+		}
 	}
-	return fc.put(key, dest, fetchCb)
+	return fc.get(key, dest)
 }

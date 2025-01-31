@@ -40,6 +40,34 @@ func CreateTempDir(ctx context.Context, cb createTempDirCb) error {
 	return cb(dir)
 }
 
+// Gets the size of the provided path in bytes
+// Returns an error if this fails
+func GetPathSize(ctx context.Context, path string) (int, error) {
+	fail := func(err error) (int, error) {
+		return 0, err
+	}
+	lstat, err := os.Lstat(path)
+	if err != nil {
+		return fail(err)
+	}
+	if !lstat.IsDir() {
+		return int(lstat.Size()), nil
+	}
+	size := 0
+	subpaths, err := ListDir(ctx, path)
+	if err != nil {
+		return fail(err)
+	}
+	for _, subpath := range subpaths {
+		subsize, err := GetPathSize(ctx, subpath)
+		if err != nil {
+			return fail(err)
+		}
+		size += subsize
+	}
+	return size, nil
+}
+
 // Lists the subpaths in the given directory
 // Returns an error if the path is not a directory
 func ListDir(ctx context.Context, path string) ([]string, error) {

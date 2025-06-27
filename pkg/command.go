@@ -107,7 +107,14 @@ func (cmd *command) Run() (string, error) {
 	if err == nil {
 		err = cmdErr
 		if err != nil {
-			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", cmdTruncateString(stderr, 128), "stdout", cmdTruncateString(stdout, 128))
+			truncate := os.Getenv("GSH_CMD_STDIO_TRUNCATION_DISABLED") == ""
+			truncErr := stderr
+			truncOut := stdout
+			if truncate {
+				truncErr = cmdTruncateString(truncErr, 128)
+				truncOut = cmdTruncateString(truncOut, 128)
+			}
+			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", truncErr, "stdout", truncOut)
 		}
 	}
 

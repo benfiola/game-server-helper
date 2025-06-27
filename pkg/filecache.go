@@ -226,10 +226,10 @@ func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 		cachedSrc := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
 		xattrs := os.Getenv("SQUASHFS_NO_XATTRS") == ""
 		args := []string{"mksquashfs"}
+		args = append(args, src, cachedSrc)
 		if !xattrs {
 			args = append(args, "-no-xattrs")
 		}
-		args = append(args, src, cachedSrc)
 		_, err = Command(fc.ctx, args, CmdOpts{}).Run()
 		if err != nil {
 			return err

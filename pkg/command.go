@@ -107,7 +107,7 @@ func (cmd *command) Run() (string, error) {
 	if err == nil {
 		err = cmdErr
 		if err != nil {
-			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", cmdTruncateString(stderr, 128), "stdout", cmdTruncateString(stdout, 128))
+			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", stderr, "stdout", stdout)
 		}
 	}
 

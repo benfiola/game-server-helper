@@ -107,7 +107,14 @@ func (cmd *command) Run() (string, error) {
 	if err == nil {
 		err = cmdErr
 		if err != nil {
-			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", stderr, "stdout", stdout)
+			truncate := os.Getenv("CMD_NO_TRUNCATE_STDIO") == ""
+			tStderr := stderr
+			tStdout := stdout
+			if truncate {
+				tStderr = cmdTruncateString(tStderr, 128)
+				tStdout = cmdTruncateString(tStdout, 128)
+			}
+			Logger(cmd.ctx).Warn("command failed", "cmd", cmd.execCmd.Args, "stderr", tStderr, "stdout", tStdout)
 		}
 	}
 

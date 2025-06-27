@@ -110,7 +110,13 @@ func (fc *fileCache) get(key string, dest string) error {
 		if err != nil {
 			return err
 		}
-		_, err = Command(fc.ctx, []string{"unsquashfs", "-force", "-no-xattrs", "-dest", dest, item.Path}, CmdOpts{}).Run()
+		xattrs := os.Getenv("SQUASHFS_NO_XATTRS") == ""
+		args := []string{"unsquashfs", "-force"}
+		if !xattrs {
+			args = append(args, "-no-xattrs")
+		}
+		args = append(args, "-dest", dest, item.Path)
+		_, err = Command(fc.ctx, args, CmdOpts{}).Run()
 		if err != nil {
 			return err
 		}
@@ -218,7 +224,13 @@ func (fc *fileCache) put(key string, fetchCb fileCacheFetchCb) error {
 			return err
 		}
 		cachedSrc := filepath.Join(fc.dir, fmt.Sprintf("%s.squashfs", key))
-		_, err = Command(fc.ctx, []string{"mksquashfs", "-no-xattrs", src, cachedSrc}, CmdOpts{}).Run()
+		xattrs := os.Getenv("SQUASHFS_NO_XATTRS") == ""
+		args := []string{"mksquashfs"}
+		if !xattrs {
+			args = append(args, "-no-xattrs")
+		}
+		args = append(args, src, cachedSrc)
+		_, err = Command(fc.ctx, args, CmdOpts{}).Run()
 		if err != nil {
 			return err
 		}

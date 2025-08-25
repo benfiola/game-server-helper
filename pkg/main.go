@@ -63,6 +63,8 @@ func bootstrap(ctx context.Context) error {
 
 // Initialies the entrypoint - setting defaults and validating fields.
 func (e *Entrypoint) initialize() error {
+	e.ctx = context.Background()
+
 	// set logger early to ensure that errors during initialization can be logged
 	e.logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
 	e.ctx = context.WithValue(e.ctx, ctxKeyLogger{}, e.logger)
@@ -71,7 +73,6 @@ func (e *Entrypoint) initialize() error {
 	if err != nil {
 		return err
 	}
-	e.ctx = context.Background()
 	if e.Dirs == nil {
 		e.Dirs = Map[string, string]{}
 	}

@@ -63,6 +63,10 @@ func bootstrap(ctx context.Context) error {
 
 // Initialies the entrypoint - setting defaults and validating fields.
 func (e *Entrypoint) initialize() error {
+	// set logger early to ensure that errors during initialization can be logged
+	e.logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
+	e.ctx = context.WithValue(e.ctx, ctxKeyLogger{}, e.logger)
+
 	err := env.Parse(e)
 	if err != nil {
 		return err
@@ -81,7 +85,6 @@ func (e *Entrypoint) initialize() error {
 		}
 		e.Dirs[key] = filepath.Join(wd, path)
 	}
-	e.logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{}))
 	if e.Main == nil {
 		return fmt.Errorf("main unset")
 	}
@@ -93,7 +96,6 @@ func (e *Entrypoint) initialize() error {
 	e.ctx = context.WithValue(e.ctx, ctxKeyDirs{}, e.Dirs)
 	e.ctx = context.WithValue(e.ctx, ctxKeyFileCacheEnabled{}, e.FileCacheEnabled)
 	e.ctx = context.WithValue(e.ctx, ctxKeyFileCacheSizeLimit{}, e.FileCacheSizeLimit)
-	e.ctx = context.WithValue(e.ctx, ctxKeyLogger{}, e.logger)
 	e.ctx = context.WithValue(e.ctx, ctxKeyUuid{}, e.uuid)
 	e.ctx = context.WithValue(e.ctx, ctxKeyVersion{}, e.Version)
 
